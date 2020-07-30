@@ -14,8 +14,9 @@
   (description "Parsing of plist files in the XML format in pure OCaml")
   (depends
     (base64 (and (>= 3.4) (< 4.0)))
-    (ISO (and (>= 0.2.6) (< 1.0)))
+    (ISO8601 (and (>= 0.2.6) (< 1.0)))
     (markup (and (>= 0.8) (< 0.9)))
+    (odoc :with-doc)
     (ocaml (>= 4.08))))
 
 (package
@@ -24,4 +25,5 @@
   (description "Parsing of plist files in the XML format with Lwt")
   (depends
     plist-xml
-    (lwt (and (>= 5.0.0) (< 6.0)))))
+    (lwt (and (>= 5.0.0) (< 6.0)))
+    (odoc :with-doc)))
