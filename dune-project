@@ -16,8 +16,8 @@
     (base64 (and (>= 3.4) (< 4.0)))
     (ISO8601 (and (>= 0.2.6) (< 1.0)))
     (markup (and (>= 0.8) (< 0.9)))
-    (odoc :with-doc)
-    (ocaml (>= 4.08))))
+    (ocaml (>= 4.08))
+    (odoc :with-doc)))
 
 (package
   (name plist-xml-lwt)
@@ -25,5 +25,6 @@
   (description "Parsing of plist files in the XML format with Lwt")
   (depends
     plist-xml
-    (lwt (and (>= 5.0.0) (< 6.0)))
+    (lwt (and (>= 5.0) (< 6.0)))
+    (markup-lwt (and (>= 0.5) (< 0.6)))
     (odoc :with-doc)))

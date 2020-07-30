@@ -1,4 +1,4 @@
-name: github pages
+name: Upload docs
 
 on:
   push:
@@ -20,6 +20,7 @@ jobs:
         run: |
           eval $(opam env)
           opam install ./plist-xml.opam ./plist-xml-lwt.opam
+          opam install odoc
           dune build @doc
 
       - name: Deploy
