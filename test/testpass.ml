@@ -11,7 +11,7 @@ let () =
           prerr_endline ("Testing " ^ str);
           let chan = open_in ("pass/" ^ str) in
           let stream = Markup.channel chan in
-          ignore (Plist.plist_of_xml stream)
+          ignore (Plist.plist_of_xml_exn stream)
         );
         loop ()
       in try loop () with End_of_file -> ()

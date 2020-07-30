@@ -48,13 +48,16 @@ module Sync : STREAM
         and type parser = Markup.sync Markup.parser
 
 module Make(S : STREAM) : sig
-  val plist_of_stream : Markup.content_signal S.stream -> t S.m
+  val plist_of_stream_exn : Markup.content_signal S.stream -> t S.m
+  (** Raises [Parse_error] upon failure. *)
 
-  val plist_of_xml :
+  val plist_of_xml_exn :
     ?report:(Markup.location -> Markup.Error.t -> unit) ->
     ?encoding:Markup.Encoding.t ->
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
     char S.stream -> t S.m
+  (** Raises [Parse_error] upon failure. See documentation for
+      [Markup.parse_xml] for labeled parameter information. *)
 end

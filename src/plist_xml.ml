@@ -74,17 +74,17 @@ module Make (S : STREAM) = struct
     | Some (`Text strs) ->
        List.iter check_whitespace strs;
        skip_whitespace stream
-    | Some (#start_or_end as v) -> S.return (Some v)
+    | (Some #start_or_end as v) -> S.return v
     | None -> S.return None
 
-  let rec peek_whitespace stream =
+  let rec peek_skip_whitespace stream =
     let* peeked = S.peek stream in
     match peeked with
     | Some (`Text strs) ->
        List.iter check_whitespace strs;
        ignore (S.next stream);
-       peek_whitespace stream
-    | Some (#start_or_end as v) -> S.return (Some v)
+       peek_skip_whitespace stream
+    | (Some #start_or_end as v) -> S.return v
     | None -> S.return None
 
   let decode_base64 strs =
@@ -117,7 +117,7 @@ module Make (S : STREAM) = struct
     in loop strs (M.decode decoder)
 
   let rec parse_array acc stream =
-    let* peeked = peek_whitespace stream in
+    let* peeked = peek_skip_whitespace stream in
     match peeked with
     | Some `End_element ->
        (* Munch end element *)
@@ -233,7 +233,7 @@ module Make (S : STREAM) = struct
     | Some `End_element -> raise (Parse_error "Got end element")
     | None -> end_of_doc ()
 
-  let plist_of_stream stream =
+  let plist_of_stream_exn stream =
     let* next = skip_whitespace stream in
     match next with
     | Some (`Start_element((_, "plist"), _)) ->
@@ -245,9 +245,9 @@ module Make (S : STREAM) = struct
        end
     | _ -> raise (Parse_error "Expected opening plist")
 
-  let plist_of_xml ?report ?encoding ?namespace ?entity ?context s =
+  let plist_of_xml_exn ?report ?encoding ?namespace ?entity ?context s =
     S.parse_xml ?report ?encoding ?namespace ?entity ?context s
     |> S.signals
     |> S.content
-    |> plist_of_stream
+    |> plist_of_stream_exn
 end
