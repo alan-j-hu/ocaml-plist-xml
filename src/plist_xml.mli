@@ -1,5 +1,5 @@
 (** Plist values *)
-type value =
+type t =
   [ `Null
   | `Bool of bool
   | `Data of string
@@ -7,11 +7,8 @@ type value =
   | `Float of float
   | `Int of int
   | `String of string
-  | `A of value list
-  | `O of t ]
-
-(** A plist dictionary. *)
-and t = (string * value) list
+  | `A of t list
+  | `O of (string * t) list ]
 
 exception Parse_error of string
 

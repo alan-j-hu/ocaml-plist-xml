@@ -1,4 +1,4 @@
-type value =
+type t =
   [ `Null
   | `Bool of bool
   | `Data of string
@@ -6,10 +6,8 @@ type value =
   | `Float of float
   | `Int of int
   | `String of string
-  | `A of value list
-  | `O of (string * value) list ]
-
-type t = (string * value) list
+  | `A of t list
+  | `O of (string * t) list ]
 
 exception Parse_error of string
 
@@ -235,17 +233,11 @@ module Make (S : STREAM) = struct
     | Some `End_element -> raise (Parse_error "Got end element")
     | None -> end_of_doc ()
 
-  let parse_dict stream =
-    let* next = skip_whitespace stream in
-    match next with
-    | Some (`Start_element((_, "dict"), _)) -> parse_dict [] stream
-    | _ -> raise (Parse_error "Expected dict")
-
   let plist_of_stream stream =
     let* next = skip_whitespace stream in
     match next with
     | Some (`Start_element((_, "plist"), _)) ->
-       let* ret = parse_dict stream in
+       let* ret = parse_val stream in
        let* next = skip_whitespace stream in
        begin match next with
        | Some `End_element -> S.return ret

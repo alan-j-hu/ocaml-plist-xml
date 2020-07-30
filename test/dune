@@ -1,4 +1,4 @@
 (tests
-  (names testpass)
-  (deps (glob_files pass/*))
+  (names testpass testfail)
+  (deps (glob_files pass/*.plist) (glob_files fail/*.plist))
   (libraries plist_xml unix))
