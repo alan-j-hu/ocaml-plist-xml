@@ -103,7 +103,7 @@ module Make (S : STREAM) = struct
     | Some (`Text strs) ->
        List.iter check_whitespace strs;
        skip_whitespace stream
-    | (Some #start_or_end as v) -> S.return v
+    | Some #start_or_end as some -> S.return some
     | None -> S.return None
 
   let rec peek_skip_whitespace stream =
@@ -113,7 +113,7 @@ module Make (S : STREAM) = struct
        List.iter check_whitespace strs;
        ignore (S.next stream);
        peek_skip_whitespace stream
-    | (Some #start_or_end as v) -> S.return v
+    | Some #start_or_end as some -> S.return some
     | None -> S.return None
 
   let rec parse_array acc stream =
@@ -263,3 +263,5 @@ module Make (S : STREAM) = struct
     |> S.content
     |> plist_of_stream_exn
 end
+
+include Make(Sync)

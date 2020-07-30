@@ -13,6 +13,20 @@ type t =
 
 exception Parse_error of string
 
+val plist_of_stream_exn :
+  (Markup.content_signal, Markup.sync) Markup.stream -> t
+(** Raises [Parse_error] upon failure. *)
+
+val plist_of_xml_exn :
+  ?report:(Markup.location -> Markup.Error.t -> unit) ->
+  ?encoding:Markup.Encoding.t ->
+  ?namespace:(string -> string option) ->
+  ?entity:(string -> string option) ->
+  ?context:[< `Document | `Fragment ] ->
+  (char, Markup.sync) Markup.stream -> t
+(** Raises [Parse_error] upon failure. See documentation for
+    [Markup.parse_xml] for labeled parameter information. *)
+
 module type STREAM = sig
   type 'a stream
 
