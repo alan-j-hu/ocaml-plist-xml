@@ -1,0 +1,3 @@
+(library
+  (name plist_xml)
+  (libraries base64.rfc2045 markup))

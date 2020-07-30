@@ -1,0 +1,4 @@
+(tests
+  (names testpass)
+  (deps (glob_files pass/*))
+  (libraries plist_xml unix))
