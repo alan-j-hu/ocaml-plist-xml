@@ -3,14 +3,15 @@ opam-version: "2.0"
 version: "0.1"
 synopsis: "Parsing of plist files in the XML format in pure OCaml"
 description: "Parsing of plist files in the XML format in pure OCaml"
-maintainer: ["Alan" "Hu"]
-authors: ["Alan" "Hu"]
+maintainer: ["Alan Hu <hu.ala@northeastern.edu>"]
+authors: ["Alan Hu <hu.ala@northeastern.edu>"]
 license: "MIT"
 homepage: "https://github.com/dosaylazy/ocaml-plist-xml"
 bug-reports: "https://github.com/dosaylazy/ocaml-plist-xml/issues"
 depends: [
   "dune" {>= "2.6"}
   "base64" {>= "3.4" & < "4.0"}
+  "ISO" {>= "0.2.6" & < "1.0"}
   "markup" {>= "0.8" & < "0.9"}
   "ocaml" {>= "4.08"}
 ]

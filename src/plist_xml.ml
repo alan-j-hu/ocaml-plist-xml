@@ -2,7 +2,7 @@ type t =
   [ `Null
   | `Bool of bool
   | `Data of string
-  | `Date of string
+  | `Date of float * float option
   | `Float of float
   | `Int of int
   | `String of string
@@ -61,6 +61,35 @@ let check_whitespace =
         raise (Parse_error ("Unexpected character " ^ (String.make 1 ch)))
     )
 
+let decode_base64 strs =
+  let module M = Base64_rfc2045 in
+  let decoder = M.decoder `Manual in
+  let outbuf = Buffer.create 10 in
+  let rec loop strs = function
+    | `Await ->
+       begin match strs with
+       | str :: strs ->
+          let buf = Buffer.create (String.length str) in
+          String.iter (fun ch ->
+              if isn't_whitespace ch then
+                Buffer.add_char buf ch
+            ) str;
+          M.src decoder (Buffer.to_bytes buf) 0 (Buffer.length buf);
+          loop strs (M.decode decoder)
+       | [] ->
+          M.src decoder (Bytes.create 0) 0 0;
+          loop [] (M.decode decoder)
+       end
+    | `End -> Buffer.contents outbuf
+    | `Flush str ->
+       Buffer.add_string outbuf str;
+       loop strs (M.decode decoder)
+    | `Malformed str ->
+       raise (Parse_error ("Malformed base64: " ^ str))
+    | `Wrong_padding ->
+       raise (Parse_error ("Base64 wrong padding"))
+  in loop strs (M.decode decoder)
+
 module Make (S : STREAM) = struct
   let ( let* ) = S.bind
 
@@ -86,35 +115,6 @@ module Make (S : STREAM) = struct
        peek_skip_whitespace stream
     | (Some #start_or_end as v) -> S.return v
     | None -> S.return None
-
-  let decode_base64 strs =
-    let module M = Base64_rfc2045 in
-    let decoder = M.decoder `Manual in
-    let outbuf = Buffer.create 10 in
-    let rec loop strs = function
-      | `Await ->
-         begin match strs with
-         | str :: strs ->
-            let buf = Buffer.create (String.length str) in
-            String.iter (fun ch ->
-                if isn't_whitespace ch then
-                  Buffer.add_char buf ch
-              ) str;
-            M.src decoder (Buffer.to_bytes buf) 0 (Buffer.length buf);
-            loop strs (M.decode decoder)
-         | [] ->
-            M.src decoder (Bytes.create 0) 0 0;
-            loop [] (M.decode decoder)
-         end
-      | `End -> Buffer.contents outbuf
-      | `Flush str ->
-         Buffer.add_string outbuf str;
-         loop strs (M.decode decoder)
-      | `Malformed str ->
-         raise (Parse_error ("Malformed base64: " ^ str))
-      | `Wrong_padding ->
-         raise (Parse_error ("Base64 wrong padding"))
-    in loop strs (M.decode decoder)
 
   let rec parse_array acc stream =
     let* peeked = peek_skip_whitespace stream in
@@ -173,7 +173,11 @@ module Make (S : STREAM) = struct
        | Some (`Text [str]) ->
           let* next = S.next stream in
           begin match next with
-          | Some `End_element -> S.return (`Date str)
+          | Some `End_element ->
+             let time, offset =
+               try ISO8601.Permissive.datetime_tz ~reqtime:false str with
+               | Failure msg -> raise (Parse_error msg)
+             in S.return (`Date(time, offset))
           | _ -> expected_closing ()
           end
        | _ -> raise (Parse_error "Expected date")
@@ -193,7 +197,11 @@ module Make (S : STREAM) = struct
        | Some (`Text [str]) ->
           let* next = S.next stream in
           begin match next with
-          | Some `End_element -> S.return (`Int (int_of_string str))
+          | Some `End_element ->
+             begin match int_of_string_opt str with
+             | Some int -> S.return (`Int int)
+             | None -> raise (Parse_error ("Malformed int " ^ str))
+             end
           | _ -> expected_closing ()
           end
        | _ -> raise (Parse_error "Expected int")
@@ -204,7 +212,11 @@ module Make (S : STREAM) = struct
        | Some (`Text [str]) ->
           let* next = S.next stream in
           begin match next with
-          | Some `End_element -> S.return (`Float (Float.of_string str))
+          | Some `End_element ->
+             begin match float_of_string_opt str with
+             | Some float -> S.return (`Float float)
+             | None -> raise (Parse_error ("Malformed float " ^ str))
+             end
           | _ -> expected_closing ()
           end
        | _ -> raise (Parse_error "Expected float")

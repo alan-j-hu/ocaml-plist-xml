@@ -3,12 +3,13 @@ type t =
   [ `Null
   | `Bool of bool
   | `Data of string
-  | `Date of string
+  | `Date of float * float option (** (timestamp, timezone) *)
   | `Float of float
   | `Int of int
   | `String of string
-  | `A of t list
-  | `O of (string * t) list ]
+  | `A of t list (** Array *)
+  | `O of (string * t) list (** Dictionary *)
+  ]
 
 exception Parse_error of string
 
