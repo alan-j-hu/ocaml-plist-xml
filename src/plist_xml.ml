@@ -16,40 +16,46 @@ let end_of_doc () = raise (Parse_error "End of document")
 let expected_closing () = raise (Parse_error "Expected closing tag")
 
 module type STREAM = sig
-  type 'a stream
-  type 'a m
-  type parser
-  val next : 'a stream -> 'a option m
-  val peek : 'a stream -> 'a option m
+  type eff
+  type 'a io
+  val next : ('a, eff) Markup.stream -> 'a option io
+  val peek : ('a, eff) Markup.stream -> 'a option io
   val parse_xml :
-    ?report:(Markup.location -> Markup.Error.t -> unit) ->
+    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
     ?encoding:Markup.Encoding.t ->
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
-    char stream -> parser
-  val signals : parser -> Markup.signal stream
-  val content : Markup.signal stream -> Markup.content_signal stream
-  val bind : 'a m -> ('a -> 'b m) -> 'b m
-  val return : 'a -> 'a m
+    (char, eff) Markup.stream -> eff Markup.parser
+  val bind : 'a io -> ('a -> 'b io) -> 'b io
+  val return : 'a -> 'a io
 end
 
-module Sync : STREAM
-       with type 'a stream = ('a, Markup.sync) Markup.stream
-        and type 'a m = 'a
-        and type parser = Markup.sync Markup.parser
-  = struct
-  type 'a stream = ('a, Markup.sync) Markup.stream
-  type 'a m = 'a
-  type parser = Markup.sync Markup.parser
+module Sync : STREAM with type eff = Markup.sync and type 'a io = 'a = struct
+  type eff = Markup.sync
+  type 'a io = 'a
   let next = Markup.next
   let peek = Markup.peek
-  let parse_xml ?report ?encoding ?namespace ?entity ?context s =
-    Markup.parse_xml ?report ?encoding ?namespace ?entity ?context s
-  let signals = Markup.signals
-  let content = Markup.content
+  let parse_xml ?report ?encoding ?namespace ?entity ?context =
+    Markup.parse_xml ?report ?encoding ?namespace ?entity ?context
   let bind x f = f x
   let return x = x
+end
+
+module type S = sig
+  type eff
+  type 'a io
+
+  val plist_of_stream_exn :
+    (Markup.content_signal, eff) Markup.stream -> t io
+
+  val parse_plist_exn :
+    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
+    ?encoding:Markup.Encoding.t ->
+    ?namespace:(string -> string option) ->
+    ?entity:(string -> string option) ->
+    ?context:[< `Document | `Fragment ] ->
+    (char, eff) Markup.stream -> t io
 end
 
 let isn't_whitespace ch =
@@ -91,6 +97,9 @@ let decode_base64 strs =
   in loop strs (M.decode decoder)
 
 module Make (S : STREAM) = struct
+  type eff = S.eff
+  type 'a io = 'a S.io
+
   let ( let* ) = S.bind
 
   type start_or_end =
@@ -213,7 +222,7 @@ module Make (S : STREAM) = struct
           let* next = S.next stream in
           begin match next with
           | Some `End_element ->
-             begin match float_of_string_opt str with
+             begin match Float.of_string_opt str with
              | Some float -> S.return (`Float float)
              | None -> raise (Parse_error ("Malformed float " ^ str))
              end
@@ -257,10 +266,10 @@ module Make (S : STREAM) = struct
        end
     | _ -> raise (Parse_error "Expected opening plist")
 
-  let plist_of_xml_exn ?report ?encoding ?namespace ?entity ?context s =
+  let parse_plist_exn ?report ?encoding ?namespace ?entity ?context s =
     S.parse_xml ?report ?encoding ?namespace ?entity ?context s
-    |> S.signals
-    |> S.content
+    |> Markup.signals
+    |> Markup.content
     |> plist_of_stream_exn
 end
 

@@ -1,4 +1,16 @@
-(tests
-  (names testpass testfail)
+(library
+  (name test_common)
+  (libraries plist_xml unix)
+  (modules test_common))
+
+(test
+  (name test_sync)
   (deps (glob_files pass/*.plist) (glob_files fail/*.plist))
-  (libraries plist_xml unix))
+  (libraries plist_xml test_common unix)
+  (modules test_sync))
+
+(test
+  (name test_lwt)
+  (deps (glob_files pass/*.plist) (glob_files fail/*.plist))
+  (libraries lwt lwt.unix markup-lwt.unix plist_xml_lwt test_common)
+  (modules test_lwt))

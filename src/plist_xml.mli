@@ -13,66 +13,54 @@ type t =
 
 exception Parse_error of string
 
-val plist_of_stream_exn :
-  (Markup.content_signal, Markup.sync) Markup.stream -> t
-(** Raises [Parse_error] upon failure. *)
-
-val plist_of_xml_exn :
-  ?report:(Markup.location -> Markup.Error.t -> unit) ->
-  ?encoding:Markup.Encoding.t ->
-  ?namespace:(string -> string option) ->
-  ?entity:(string -> string option) ->
-  ?context:[< `Document | `Fragment ] ->
-  (char, Markup.sync) Markup.stream -> t
-(** Raises [Parse_error] upon failure. See documentation for
-    [Markup.parse_xml] for labeled parameter information. *)
-
 module type STREAM = sig
-  type 'a stream
+  type eff
+  (** The phantom type for the indexed effect ([Markup.sync] or
+      [Markup.async]). *)
 
-  type 'a m
+  type 'a io
+  (** The wrapper type for the effect. *)
 
-  type parser
+  val next : ('a, eff) Markup.stream -> 'a option io
 
-  val next : 'a stream -> 'a option m
-
-  val peek : 'a stream -> 'a option m
+  val peek : ('a, eff) Markup.stream -> 'a option io
 
   val parse_xml :
-    ?report:(Markup.location -> Markup.Error.t -> unit) ->
+    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
     ?encoding:Markup.Encoding.t ->
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
-    char stream -> parser
+    (char, eff) Markup.stream -> eff Markup.parser
 
-  val signals : parser -> Markup.signal stream
-
-  val content : Markup.signal stream -> Markup.content_signal stream
-
-  val bind : 'a m -> ('a -> 'b m) -> 'b m
+  val bind : 'a io -> ('a -> 'b io) -> 'b io
   (** Monadic bind *)
 
-  val return : 'a -> 'a m
+  val return : 'a -> 'a io
   (** Monadic return *)
 end
 
-module Sync : STREAM
-       with type 'a stream = ('a, Markup.sync) Markup.stream
-        and type 'a m = 'a
-        and type parser = Markup.sync Markup.parser
+module Sync : STREAM with type eff = Markup.sync and type 'a io = 'a
 
-module Make(S : STREAM) : sig
-  val plist_of_stream_exn : Markup.content_signal S.stream -> t S.m
+module type S = sig
+  type eff
+  type 'a io
+
+  val plist_of_stream_exn :
+    (Markup.content_signal, eff) Markup.stream -> t io
   (** Raises [Parse_error] upon failure. *)
 
-  val plist_of_xml_exn :
-    ?report:(Markup.location -> Markup.Error.t -> unit) ->
+  val parse_plist_exn :
+    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
     ?encoding:Markup.Encoding.t ->
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
-    char S.stream -> t S.m
+    (char, eff) Markup.stream -> t io
   (** Raises [Parse_error] upon failure. See documentation for
       [Markup.parse_xml] for labeled parameter information. *)
 end
+
+module Make (S : STREAM) : S with type eff = S.eff and type 'a io = 'a S.io
+
+include S with type eff = Markup.sync and type 'a io = 'a

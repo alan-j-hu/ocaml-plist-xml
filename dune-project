@@ -17,3 +17,11 @@
     (ISO (and (>= 0.2.6) (< 1.0)))
     (markup (and (>= 0.8) (< 0.9)))
     (ocaml (>= 4.08))))
+
+(package
+  (name plist-xml-lwt)
+  (synopsis "Parsing of plist files in the XML format with Lwt")
+  (description "Parsing of plist files in the XML format with Lwt")
+  (depends
+    plist-xml
+    (lwt (and (>= 5.0.0) (< 6.0)))))
