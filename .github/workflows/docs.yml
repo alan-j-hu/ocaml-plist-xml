@@ -19,8 +19,8 @@ jobs:
       - name: Build
         run: |
           eval $(opam env)
-          opam install ./plist-xml.opam ./plist-xml-lwt.opam
           opam install odoc
+          opam install ./plist-xml.opam ./plist-xml-lwt.opam
           dune build @doc
 
       - name: Deploy
