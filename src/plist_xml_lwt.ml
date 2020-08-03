@@ -1,4 +1,4 @@
-module Async : Plist_xml.IO
+module IO : Plist_xml.IO
        with type s = Markup.async and type 'a io = 'a Lwt.t = struct
   type s = Markup.async
   type 'a io = 'a Lwt.t
@@ -10,4 +10,4 @@ module Async : Plist_xml.IO
   let return = Lwt.return
 end
 
-include Plist_xml.Make(Async)
+include Plist_xml.Make(IO)

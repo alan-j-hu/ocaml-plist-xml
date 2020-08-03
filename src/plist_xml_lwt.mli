@@ -1,4 +1,4 @@
-module Async : Plist_xml.IO
+module IO : Plist_xml.IO
 with type s = Markup.async and type 'a io = 'a Lwt.t
 (** Asynchronous I/O with Lwt. *)
 

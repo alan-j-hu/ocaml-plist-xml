@@ -5,12 +5,13 @@ type t =
   | `Float of float
   | `Int of int
   | `String of string
-  | `A of t list (** Array *)
-  | `O of (string * t) list (** Dictionary *)
+  | `Array of t list (** Array *)
+  | `Dict of (string * t) list (** Dictionary *)
   ]
 (** Plist values. *)
 
 val signals : t -> (Markup.signal, Markup.sync) Markup.stream
+(** Convert a plist into XML signals. *)
 
 exception Parse_error of string
 
@@ -41,7 +42,7 @@ module type IO = sig
 end
 (** The module type of synchronous or asynchronous I/O. *)
 
-module Sync : IO with type s = Markup.sync and type 'a io = 'a
+module IO : IO with type s = Markup.sync and type 'a io = 'a
 (** Synchronous I/O under the identity monad. *)
 
 module type S = sig

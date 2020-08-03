@@ -5,8 +5,8 @@ type t =
   | `Float of float
   | `Int of int
   | `String of string
-  | `A of t list
-  | `O of (string * t) list ]
+  | `Array of t list
+  | `Dict of (string * t) list ]
 
 (* [stream] is a hard-coded coroutine. *)
 let rec stream plist k =
@@ -61,7 +61,7 @@ let rec stream plist k =
            let^ () = `Text [Int.to_string i] in
            let^ () = `End_element in
            k state
-        | `A xs ->
+        | `Array xs ->
            let^ () = start "array" in
            let rec loop = function
              | [] ->
@@ -71,7 +71,7 @@ let rec stream plist k =
                 let^^ () = stream x (fun _ -> None) in
                 loop xs
            in loop xs
-        | `O dict ->
+        | `Dict dict ->
            let^ () = start "dict" in
            let rec loop = function
              | [] ->
@@ -128,7 +128,7 @@ module type IO = sig
   val return : 'a -> 'a io
 end
 
-module Sync : IO with type s = Markup.sync and type 'a io = 'a = struct
+module IO : IO with type s = Markup.sync and type 'a io = 'a = struct
   type s = Markup.sync
   type 'a io = 'a
   let next = Markup.next
@@ -264,7 +264,7 @@ module Make (IO : IO) = struct
     match next with
     | Some (`Start_element((_, "array"), _)) ->
        let* arr = parse_array [] stream in
-       IO.return (`A arr)
+       IO.return (`Array arr)
     | Some (`Start_element((_, "data"), _)) ->
        let* next = IO.next stream in
        begin match next with
@@ -288,7 +288,7 @@ module Make (IO : IO) = struct
        end
     | Some (`Start_element((_, "dict"), _)) ->
        let* dict = parse_dict [] stream in
-       IO.return (`O dict)
+       IO.return (`Dict dict)
     | Some (`Start_element((_, "false"), _)) ->
        let* next = IO.next stream in
        begin match next with
@@ -368,4 +368,4 @@ module Make (IO : IO) = struct
     |> plist_of_stream_exn
 end
 
-include Make(Sync)
+include Make(IO)
