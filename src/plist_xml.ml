@@ -40,14 +40,23 @@ let rec stream plist k =
            k state
         | `Date(timestamp, None) ->
            let^ () = start "date" in
-           let^ () =
-             `Text [ISO8601.Permissive.string_of_datetime timestamp] in
+           let^ () = `Text [ISO8601.Permissive.string_of_datetime timestamp] in
            let^ () = `End_element in
            k state
         | `Date(timestamp, Some tz) ->
            let^ () = start "date" in
            let^ () =
-             `Text [ISO8601.Permissive.string_of_datetimezone (timestamp, tz)]
+             `Text
+               [ if tz = 0. then
+                   (* Apple's spec only requires that plists support dates in
+                      the format YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'
+
+                      If a Z is parsed from the original input date, the
+                      timezone float should be exactly 0. AFAIK it is correct
+                      to test for float equality in this case. *)
+                   ISO8601.Permissive.string_of_datetime timestamp ^ "Z"
+                 else
+                   ISO8601.Permissive.string_of_datetimezone (timestamp, tz) ]
            in
            let^ () = `End_element in
            k state
