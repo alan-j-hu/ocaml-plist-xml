@@ -16,6 +16,8 @@ module Sync : Test_common.EFF with type 'a io = 'a = struct
   let catch f handle = try f () with exn -> handle exn
 
   let protect = Fun.protect
+
+  let print_endline = print_endline
 end
 
 open Test_common.Make(Sync)

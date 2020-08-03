@@ -1,7 +1,5 @@
-(** Plist values *)
 type t =
-  [ `Null
-  | `Bool of bool
+  [ `Bool of bool
   | `Data of string
   | `Date of float * float option (** (timestamp, timezone) *)
   | `Float of float
@@ -10,20 +8,22 @@ type t =
   | `A of t list (** Array *)
   | `O of (string * t) list (** Dictionary *)
   ]
+(** Plist values. *)
+
+val signals : t -> (Markup.signal, Markup.sync) Markup.stream
 
 exception Parse_error of string
 
-module type STREAM = sig
-  type eff
-  (** The phantom type for the indexed effect ([Markup.sync] or
-      [Markup.async]). *)
+module type IO = sig
+  type s
+  (** The phantom type for the effect ([Markup.sync] or [Markup.async]). *)
 
-  type 'a io
-  (** The wrapper type for the effect. *)
+  type _ io
+  (** The effect type. *)
 
-  val next : ('a, eff) Markup.stream -> 'a option io
+  val next : ('a, s) Markup.stream -> 'a option io
 
-  val peek : ('a, eff) Markup.stream -> 'a option io
+  val peek : ('a, s) Markup.stream -> 'a option io
 
   val parse_xml :
     ?report:(Markup.location -> Markup.Error.t -> unit io) ->
@@ -31,36 +31,37 @@ module type STREAM = sig
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
-    (char, eff) Markup.stream -> eff Markup.parser
+    (char, s) Markup.stream -> s Markup.parser
 
   val bind : 'a io -> ('a -> 'b io) -> 'b io
-  (** Monadic bind *)
+  (** Monadic bind. *)
 
   val return : 'a -> 'a io
-  (** Monadic return *)
+  (** Monadic return. *)
 end
+(** The module type of synchronous or asynchronous I/O. *)
 
-module Sync : STREAM with type eff = Markup.sync and type 'a io = 'a
+module Sync : IO with type s = Markup.sync and type 'a io = 'a
+(** Synchronous I/O under the identity monad. *)
 
 module type S = sig
-  type eff
-  type 'a io
+  type s
+  type _ io
 
-  val plist_of_stream_exn :
-    (Markup.content_signal, eff) Markup.stream -> t io
+  val plist_of_stream_exn : (Markup.content_signal, s) Markup.stream -> t io
   (** Raises [Parse_error] upon failure. *)
 
-  val parse_plist_exn :
+  val parse_exn :
     ?report:(Markup.location -> Markup.Error.t -> unit io) ->
     ?encoding:Markup.Encoding.t ->
     ?namespace:(string -> string option) ->
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
-    (char, eff) Markup.stream -> t io
+    (char, s) Markup.stream -> t io
   (** Raises [Parse_error] upon failure. See documentation for
       [Markup.parse_xml] for labeled parameter information. *)
 end
 
-module Make (S : STREAM) : S with type eff = S.eff and type 'a io = 'a S.io
+module Make (IO : IO) : S with type s = IO.s and type 'a io = 'a IO.io
 
-include S with type eff = Markup.sync and type 'a io = 'a
+include S with type s = Markup.sync and type 'a io = 'a

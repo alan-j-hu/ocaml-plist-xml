@@ -1,4 +1,5 @@
-module Async : Plist_xml.STREAM
-with type eff = Markup.async and type 'a io = 'a Lwt.t
+module Async : Plist_xml.IO
+with type s = Markup.async and type 'a io = 'a Lwt.t
+(** Asynchronous I/O with Lwt. *)
 
-include Plist_xml.S with type eff = Markup.async and type 'a io = 'a Lwt.t
+include Plist_xml.S with type s = Markup.async and type 'a io = 'a Lwt.t

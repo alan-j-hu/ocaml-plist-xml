@@ -8,12 +8,13 @@ module type EFF = sig
   val bind : 'a io -> ('a -> 'b io) -> 'b io
   val return : 'a -> 'a io
 
-  val with_stream :
-    string -> ((char, eff) Markup.stream -> 'a io) -> 'a io
+  val with_stream : string -> ((char, s) Markup.stream -> 'a io) -> 'a io
 
   val catch : (unit -> 'a io) -> (exn -> 'a io) -> 'a io
 
   val protect : finally:(unit -> unit io) -> (unit -> 'a io) -> 'a io
+
+  val print_endline : string -> unit io
 end
 
 module Make (Eff : EFF) = struct
@@ -28,7 +29,12 @@ module Make (Eff : EFF) = struct
             if str <> Filename.parent_dir_name
                && str <> Filename.current_dir_name then (
               prerr_endline ("Testing " ^ str);
-              let* _ = Eff.with_stream ("pass/" ^ str) Eff.parse_plist_exn in
+              let* plist = Eff.with_stream ("pass/" ^ str) Eff.parse_exn in
+              plist
+              |> Plist_xml.signals
+              |> Markup.pretty_print
+              |> Markup.write_xml
+              |> Markup.to_channel stderr;
               Eff.return ()
             ) else
               Eff.return ()
@@ -51,9 +57,8 @@ module Make (Eff : EFF) = struct
               prerr_endline ("Testing " ^ str);
               Eff.catch
                 (fun () ->
-                  let* _ =
-                    Eff.with_stream ("fail/" ^ str) Eff.parse_plist_exn
-                  in failwith ("Test " ^ str ^ " parsed"))
+                  let* _ = Eff.with_stream ("fail/" ^ str) Eff.parse_exn in
+                  failwith ("Test " ^ str ^ " parsed"))
                 (function
                  | Plist_xml.Parse_error _ -> Eff.return ()
                  | exn -> raise exn)

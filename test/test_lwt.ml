@@ -17,6 +17,8 @@ module Lwt_eff : Test_common.EFF with type 'a io = 'a Lwt.t = struct
   let catch = Lwt.catch
 
   let protect ~finally f = Lwt.finalize f finally
+
+  let print_endline = Lwt_io.write_line Lwt_io.stdout
 end
 
 open Test_common.Make(Lwt_eff)
