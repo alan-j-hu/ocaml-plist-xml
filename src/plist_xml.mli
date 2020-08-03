@@ -14,6 +14,10 @@ val signals : t -> (Markup.signal, Markup.sync) Markup.stream
 (** Convert a plist into XML signals. *)
 
 exception Parse_error of string
+[@ocaml.warn_on_literal_pattern]
+(** Exception raised upon a parse error. The error message is purely
+    informational and you should not pattern match on it, as it is subject to
+    change. *)
 
 module type IO = sig
   type s
@@ -64,5 +68,7 @@ module type S = sig
 end
 
 module Make (IO : IO) : S with type s = IO.s and type 'a io = 'a IO.io
+(** Create a plist parser given an I/O implementation, such as synchronous I/O
+    or Lwt. *)
 
 include S with type s = Markup.sync and type 'a io = 'a
