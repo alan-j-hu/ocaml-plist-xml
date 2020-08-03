@@ -1,4 +1,4 @@
-module Lwt_eff : Test_common.EFF with type 'a io = 'a Lwt.t = struct
+module Lwt_eff : Test_common.IO with type 'a io = 'a Lwt.t = struct
   include Plist_xml_lwt
   include Lwt_unix
 
@@ -18,7 +18,9 @@ module Lwt_eff : Test_common.EFF with type 'a io = 'a Lwt.t = struct
 
   let protect ~finally f = Lwt.finalize f finally
 
-  let print_endline = Lwt_io.write_line Lwt_io.stdout
+  let prerr_endline = Lwt_io.write_line Lwt_io.stderr
+
+  let to_stderr = Markup_lwt_unix.to_channel Lwt_io.stderr
 end
 
 open Test_common.Make(Lwt_eff)

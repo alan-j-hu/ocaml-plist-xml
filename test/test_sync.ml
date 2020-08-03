@@ -1,4 +1,4 @@
-module Sync : Test_common.EFF with type 'a io = 'a = struct
+module Sync : Test_common.IO with type 'a io = 'a = struct
   include Plist_xml
 
   let opendir = Unix.opendir
@@ -17,7 +17,9 @@ module Sync : Test_common.EFF with type 'a io = 'a = struct
 
   let protect = Fun.protect
 
-  let print_endline = print_endline
+  let prerr_endline = prerr_endline
+
+  let to_stderr = Markup.to_channel stderr
 end
 
 open Test_common.Make(Sync)

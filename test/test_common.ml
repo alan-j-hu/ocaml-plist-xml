@@ -1,4 +1,4 @@
-module type EFF = sig
+module type IO = sig
   include Plist_xml.S
 
   val opendir : string -> Unix.dir_handle io
@@ -14,62 +14,63 @@ module type EFF = sig
 
   val protect : finally:(unit -> unit io) -> (unit -> 'a io) -> 'a io
 
-  val print_endline : string -> unit io
+  val prerr_endline : string -> unit io
+
+  val to_stderr : (char, Markup.sync) Markup.stream -> unit io
 end
 
-module Make (Eff : EFF) = struct
-  let ( let* ) = Eff.bind
+module Make (IO : IO) = struct
+  let ( let* ) = IO.bind
 
   let test_pass () =
-    let* handle = Eff.opendir "pass" in
-    Eff.protect (fun () ->
+    let* handle = IO.opendir "pass" in
+    IO.protect (fun () ->
         let rec loop () =
-          let* str = Eff.readdir handle in
+          let* str = IO.readdir handle in
           let* _ =
             if str <> Filename.parent_dir_name
                && str <> Filename.current_dir_name then (
-              prerr_endline ("Testing " ^ str);
-              let* plist = Eff.with_stream ("pass/" ^ str) Eff.parse_exn in
+              let* () = IO.prerr_endline ("Testing " ^ str) in
+              let* plist = IO.with_stream ("pass/" ^ str) IO.parse_exn in
               plist
               |> Plist_xml.signals
               |> Markup.pretty_print
               |> Markup.write_xml
-              |> Markup.to_channel stderr;
-              Eff.return ()
+              |> IO.to_stderr
             ) else
-              Eff.return ()
+              IO.return ()
           in loop ()
         in
-        Eff.catch loop (function
-            | End_of_file -> Eff.return ()
+        IO.catch loop (function
+            | End_of_file -> IO.return ()
             | exn -> raise exn
           )
-      ) ~finally:(fun () -> Eff.closedir handle)
+      ) ~finally:(fun () -> IO.closedir handle)
 
   let test_fail () =
-    let* handle = Eff.opendir "fail" in
-    Eff.protect (fun () ->
+    let* handle = IO.opendir "fail" in
+    IO.protect (fun () ->
         let rec loop () =
-          let* str = Eff.readdir handle in
+          let* str = IO.readdir handle in
           let* () =
             if str <> Filename.parent_dir_name
                && str <> Filename.current_dir_name then (
               prerr_endline ("Testing " ^ str);
-              Eff.catch
+              IO.catch
                 (fun () ->
-                  let* _ = Eff.with_stream ("fail/" ^ str) Eff.parse_exn in
+                  let* _ = IO.with_stream ("fail/" ^ str) IO.parse_exn in
                   failwith ("Test " ^ str ^ " parsed"))
                 (function
-                 | Plist_xml.Parse_error _ -> Eff.return ()
+                 | Plist_xml.Parse_error _ -> IO.return ()
                  | exn -> raise exn)
             ) else (
-              Eff.return ()
+              IO.return ()
             )
           in loop ()
         in
-        Eff.catch loop (function
-            | End_of_file -> Eff.return ()
+        IO.catch loop (function
+            | End_of_file -> IO.return ()
             | exn -> raise exn
           )
-      ) ~finally:(fun () -> Eff.closedir handle)
+      ) ~finally:(fun () -> IO.closedir handle)
 end
