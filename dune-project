@@ -10,8 +10,12 @@
 
 (package
   (name plist-xml)
-  (synopsis "Parsing of plist files in the XML format in pure OCaml")
-  (description "Parsing of plist files in the XML format in pure OCaml")
+  (synopsis
+    "Reading and writing of plist files in the XML format in pure OCaml")
+  (description
+    "Reading and writing of plist files in the XML format in pure OCaml.
+
+Implementation of https://www.apple.com/DTDs/PropertyList-1.0.dtd.")
   (depends
     (base64 (and (>= 3.4) (< 4.0)))
     (ISO8601 (and (>= 0.2.6) (< 1.0)))
@@ -21,8 +25,8 @@
 
 (package
   (name plist-xml-lwt)
-  (synopsis "Parsing of plist files in the XML format with Lwt")
-  (description "Parsing of plist files in the XML format with Lwt")
+  (synopsis "Reading of plist files in the XML format with Lwt")
+  (description "Reading of plist files in the XML format with Lwt.")
   (depends
     plist-xml
     (lwt (and (>= 5.0) (< 6.0)))
