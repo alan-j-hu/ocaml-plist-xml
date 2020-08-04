@@ -1,3 +1,6 @@
+(** This library references the {{: https://github.com/aantron/markup.ml}
+    Markup.ml} library. See also the documentation for that library. *)
+
 type t =
   [ `Bool of bool
   | `Data of string
@@ -27,8 +30,10 @@ module type IO = sig
   (** The effect type. *)
 
   val next : ('a, s) Markup.stream -> 'a option io
+  (** See [Markup.next] and [Markup.ASYNCHRONOUS.next]. *)
 
   val peek : ('a, s) Markup.stream -> 'a option io
+  (** See [Markup.peek] and [Markup.ASYNCHRONOUS.peek]. *)
 
   val parse_xml :
     ?report:(Markup.location -> Markup.Error.t -> unit io) ->
@@ -37,6 +42,8 @@ module type IO = sig
     ?entity:(string -> string option) ->
     ?context:[< `Document | `Fragment ] ->
     (char, s) Markup.stream -> s Markup.parser
+  (** See the documentation for [Markup.parse_xml] and
+      [Markup.ASYNCHRONOUS.parse_xml]. *)
 
   val bind : 'a io -> ('a -> 'b io) -> 'b io
   (** Monadic bind. *)
