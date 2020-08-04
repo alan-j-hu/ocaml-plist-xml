@@ -1,6 +1,6 @@
 (library
   (name test_common)
-  (libraries plist_xml unix)
+  (libraries plist-xml unix)
   (modules test_common))
 
 (test
