@@ -1,6 +1,7 @@
 (lang dune 2.6)
 (name plist-xml)
 (version 0.1)
+(documentation https://dosaylazy.github.io/ocaml-plist-xml/)
 (generate_opam_files true)
 
 (license MIT)

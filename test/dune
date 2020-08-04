@@ -6,11 +6,11 @@
 (test
   (name test_sync)
   (deps (glob_files pass/*.plist) (glob_files fail/*.plist))
-  (libraries plist_xml test_common unix)
+  (libraries plist-xml test_common unix)
   (modules test_sync))
 
 (test
   (name test_lwt)
   (deps (glob_files pass/*.plist) (glob_files fail/*.plist))
-  (libraries lwt lwt.unix markup-lwt.unix plist_xml_lwt test_common)
+  (libraries lwt lwt.unix markup-lwt.unix plist-xml-lwt test_common)
   (modules test_lwt))
