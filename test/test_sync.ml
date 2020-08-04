@@ -1,6 +1,9 @@
 module Sync : Test_common.IO with type 'a io = 'a = struct
   include Plist_xml
 
+  type s = Markup.sync
+  type 'a io = 'a
+
   let opendir = Unix.opendir
   let readdir = Unix.readdir
   let closedir = Unix.closedir

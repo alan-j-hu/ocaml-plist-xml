@@ -2,6 +2,9 @@ module Lwt_eff : Test_common.IO with type 'a io = 'a Lwt.t = struct
   include Plist_xml_lwt
   include Lwt_unix
 
+  type s = Markup.async
+  type 'a io = 'a Lwt.t
+
   let bind = Lwt.bind
   let return = Lwt.return
 

@@ -46,9 +46,6 @@ module type IO = sig
 end
 (** The module type of synchronous or asynchronous I/O. *)
 
-module IO : IO with type s = Markup.sync and type 'a io = 'a
-(** Synchronous I/O under the identity monad. *)
-
 module type S = sig
   type s
   type _ io
@@ -71,4 +68,4 @@ module Make (IO : IO) : S with type s = IO.s and type 'a io = 'a IO.io
 (** Create a plist parser given an I/O implementation, such as synchronous I/O
     or Lwt. *)
 
-include S with type s = Markup.sync and type 'a io = 'a
+include S with type s := Markup.sync and type 'a io := 'a
