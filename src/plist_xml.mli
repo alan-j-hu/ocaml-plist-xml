@@ -13,7 +13,8 @@ type t =
   ]
 (** Plist values. *)
 
-val signals : t -> (Markup.signal, Markup.sync) Markup.stream
+val signals :
+  ?encoding:string -> t -> (Markup.signal, Markup.sync) Markup.stream
 (** Convert a plist into XML signals. *)
 
 exception Parse_error of string

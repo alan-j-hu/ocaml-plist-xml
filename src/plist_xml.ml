@@ -105,13 +105,25 @@ let cons v state =
   state := (fun () -> state := k; Some v);
   state
 
-let signals plist =
+let signals ?encoding plist =
+  let doctype =
+    { Markup.doctype_name = Some "plist"
+    ; public_identifier = Some "-//Apple//DTD PLIST 1.0//EN"
+    ; system_identifier = None
+    ; raw_text =
+        Some "plist PUBLIC \
+              \"-//Apple//DTD PLIST 1.0//EN\" \
+              \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\""
+    ; force_quirks = false }
+  in
   let state =
-    cons (`Start_element(("", "plist"), []))
-      (stream plist
-         (fun state ->
-           state := (fun () -> None);
-           Some `End_element))
+    cons (`Xml Markup.{ version = "1.0"; encoding; standalone = None })
+      (cons (`Doctype doctype)
+         (cons (`Start_element(("", "plist"), [("", "version"), "1.0"]))
+            (stream plist
+               (fun state ->
+                 state := (fun () -> None);
+                 Some `End_element))))
   in
   Markup.stream (fun () -> !state ())
 
