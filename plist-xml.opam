@@ -10,9 +10,9 @@ Implementation of https://www.apple.com/DTDs/PropertyList-1.0.dtd."""
 maintainer: ["Alan Hu <hu.ala@northeastern.edu>"]
 authors: ["Alan Hu <hu.ala@northeastern.edu>"]
 license: "MIT"
-homepage: "https://github.com/dosaylazy/ocaml-plist-xml"
-doc: "https://dosaylazy.github.io/ocaml-plist-xml/"
-bug-reports: "https://github.com/dosaylazy/ocaml-plist-xml/issues"
+homepage: "https://github.com/alan-j-hu/ocaml-plist-xml"
+doc: "https://alan-j-hu.github.io/ocaml-plist-xml/"
+bug-reports: "https://github.com/alan-j-hu/ocaml-plist-xml/issues"
 depends: [
   "dune" {>= "2.6"}
   "base64" {>= "3.4" & < "4.0"}
@@ -35,4 +35,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/dosaylazy/ocaml-plist-xml.git"
+dev-repo: "git+https://github.com/alan-j-hu/ocaml-plist-xml.git"

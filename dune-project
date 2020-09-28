@@ -1,13 +1,13 @@
 (lang dune 2.6)
 (name plist-xml)
 (version 0.2.0)
-(documentation https://dosaylazy.github.io/ocaml-plist-xml/)
+(documentation https://alan-j-hu.github.io/ocaml-plist-xml/)
 (generate_opam_files true)
 
 (license MIT)
 (authors "Alan Hu <hu.ala@northeastern.edu>")
 (maintainers "Alan Hu <hu.ala@northeastern.edu>")
-(source (github dosaylazy/ocaml-plist-xml))
+(source (github alan-j-hu/ocaml-plist-xml))
 
 (package
   (name plist-xml)
