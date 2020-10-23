@@ -20,7 +20,7 @@ Implementation of https://www.apple.com/DTDs/PropertyList-1.0.dtd.")
   (depends
     (base64 (and (>= 3.4) (< 4.0)))
     (ISO8601 (and (>= 0.2.6) (< 0.3)))
-    (markup (and (>= 0.8) (< 2.0)))
+    (markup (and (>= 0.8) (< 1.0)))
     (ocaml (>= 4.08))
     (odoc :with-doc)))
 
