@@ -58,7 +58,7 @@ module type S = sig
   type s
   type _ io
 
-  val plist_of_stream_exn : (Markup.content_signal, s) Markup.stream -> t io
+  val plist_of_stream_exn : (Markup.signal, s) Markup.stream -> t io
   (** Raises [Parse_error] upon failure. *)
 
   val parse_exn :

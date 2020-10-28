@@ -165,7 +165,7 @@ module type S = sig
   type _ io
 
   val plist_of_stream_exn :
-    (Markup.content_signal, s) Markup.stream -> t io
+    (Markup.signal, s) Markup.stream -> t io
 
   val parse_exn :
     ?report:(Markup.location -> Markup.Error.t -> unit io) ->
@@ -222,9 +222,21 @@ module Make (IO : IO) = struct
     [ `End_element
     | `Start_element of Markup.name * (Markup.name * string) list ]
 
+  type content_signal =
+    [ `End_element
+    | `Start_element of Markup.name * (Markup.name * string) list
+    | `Text of string list ]
+
+  let rec next stream =
+    let* opt = IO.next stream in
+    match opt with
+    | Some (`Comment _ | `PI _ | `Doctype _ | `Xml _) -> next stream
+    | Some #content_signal as some -> IO.return some
+    | None -> IO.return None
+
   let rec skip_whitespace stream =
-    let* next = IO.next stream in
-    match next with
+    let* signal = next stream in
+    match signal with
     | Some (`Text strs) ->
        List.iter check_whitespace strs;
        skip_whitespace stream
@@ -234,6 +246,9 @@ module Make (IO : IO) = struct
   let rec peek_skip_whitespace stream =
     let* peeked = IO.peek stream in
     match peeked with
+    | Some (`Comment _ | `PI _ | `Doctype _ | `Xml _) ->
+       ignore (IO.next stream);
+       peek_skip_whitespace stream
     | Some (`Text strs) ->
        List.iter check_whitespace strs;
        ignore (IO.next stream);
@@ -253,15 +268,15 @@ module Make (IO : IO) = struct
        parse_array (v :: acc) stream
 
   and parse_dict acc stream =
-    let* next = skip_whitespace stream in
-    match next with
+    let* signal = skip_whitespace stream in
+    match signal with
     | Some `End_element -> IO.return (List.rev acc)
     | Some (`Start_element((_, "key"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text [key]) ->
-          let* next = IO.next stream in
-          begin match next with
+          let* signal = next stream in
+          begin match signal with
           | Some `End_element ->
              let* value = parse_val stream in
              parse_dict ((key, value) :: acc) stream
@@ -281,23 +296,23 @@ module Make (IO : IO) = struct
     | None -> end_of_doc ()
 
   and parse_val stream =
-    let* next = skip_whitespace stream in
-    match next with
+    let* signal = skip_whitespace stream in
+    match signal with
     | Some (`Start_element((_, "array"), _)) ->
        let* arr = parse_array [] stream in
        IO.return (`Array arr)
     | Some (`Start_element((_, "data"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text strs) -> IO.return (`Data (decode_base64 strs))
        | _ -> raise (Parse_error "Expected base64-encoded data")
        end
     | Some (`Start_element((_, "date"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text [str]) ->
-          let* next = IO.next stream in
-          begin match next with
+          let* signal = next stream in
+          begin match signal with
           | Some `End_element ->
              let time, offset =
                try ISO8601.Permissive.datetime_tz ~reqtime:false str with
@@ -311,17 +326,17 @@ module Make (IO : IO) = struct
        let* dict = parse_dict [] stream in
        IO.return (`Dict dict)
     | Some (`Start_element((_, "false"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some `End_element -> IO.return (`Bool false)
        | _ -> expected_closing ()
        end
     | Some (`Start_element((_, "integer"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text [str]) ->
-          let* next = IO.next stream in
-          begin match next with
+          let* signal = next stream in
+          begin match signal with
           | Some `End_element ->
              begin match int_of_string_opt str with
              | Some int -> IO.return (`Int int)
@@ -332,11 +347,11 @@ module Make (IO : IO) = struct
        | _ -> raise (Parse_error "Expected int")
        end
     | Some (`Start_element((_, "real"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text [str]) ->
-          let* next = IO.next stream in
-          begin match next with
+          let* signal = next stream in
+          begin match signal with
           | Some `End_element ->
              begin match Float.of_string_opt str with
              | Some float -> IO.return (`Float float)
@@ -347,11 +362,11 @@ module Make (IO : IO) = struct
        | _ -> raise (Parse_error "Expected float")
        end
     | Some (`Start_element((_, "string"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some (`Text [str]) ->
-          let* next = IO.next stream in
-          begin match next with
+          let* signal = next stream in
+          begin match signal with
           | Some `End_element -> IO.return (`String str)
           | _ -> expected_closing ()
           end
@@ -360,8 +375,8 @@ module Make (IO : IO) = struct
        | _ -> raise (Parse_error "Expected text inside string")
        end
     | Some (`Start_element((_, "true"), _)) ->
-       let* next = IO.next stream in
-       begin match next with
+       let* signal = next stream in
+       begin match signal with
        | Some `End_element -> IO.return (`Bool true)
        | _ -> expected_closing ()
        end
@@ -371,12 +386,12 @@ module Make (IO : IO) = struct
     | None -> end_of_doc ()
 
   let plist_of_stream_exn stream =
-    let* next = skip_whitespace stream in
-    match next with
+    let* signal = skip_whitespace stream in
+    match signal with
     | Some (`Start_element((_, "plist"), _)) ->
        let* ret = parse_val stream in
-       let* next = skip_whitespace stream in
-       begin match next with
+       let* signal = skip_whitespace stream in
+       begin match signal with
        | Some `End_element -> IO.return ret
        | _ -> expected_closing ()
        end
@@ -385,7 +400,6 @@ module Make (IO : IO) = struct
   let parse_exn ?report ?encoding ?namespace ?entity ?context s =
     IO.parse_xml ?report ?encoding ?namespace ?entity ?context s
     |> Markup.signals
-    |> Markup.content
     |> plist_of_stream_exn
 end
 
