@@ -1,5 +1,5 @@
 module IO : Plist_xml.IO
-       with type s = Markup.async and type 'a io = 'a Lwt.t = struct
+  with type s = Markup.async and type 'a io = 'a Lwt.t = struct
   type s = Markup.async
   type 'a io = 'a Lwt.t
   let next = Markup_lwt.next

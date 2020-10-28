@@ -29,7 +29,7 @@ module Make (IO : IO) = struct
           let* str = IO.readdir handle in
           let* _ =
             if str <> Filename.parent_dir_name
-               && str <> Filename.current_dir_name then (
+            && str <> Filename.current_dir_name then (
               let* () = IO.prerr_endline ("Testing " ^ str) in
               let* plist = IO.with_stream ("pass/" ^ str) IO.parse_exn in
               plist
@@ -54,15 +54,15 @@ module Make (IO : IO) = struct
           let* str = IO.readdir handle in
           let* () =
             if str <> Filename.parent_dir_name
-               && str <> Filename.current_dir_name then (
+            && str <> Filename.current_dir_name then (
               prerr_endline ("Testing " ^ str);
               IO.catch
                 (fun () ->
-                  let* _ = IO.with_stream ("fail/" ^ str) IO.parse_exn in
-                  failwith ("Test " ^ str ^ " parsed"))
+                   let* _ = IO.with_stream ("fail/" ^ str) IO.parse_exn in
+                   failwith ("Test " ^ str ^ " parsed"))
                 (function
-                 | Plist_xml.Parse_error _ -> IO.return ()
-                 | exn -> raise exn)
+                  | Plist_xml.Parse_error _ -> IO.return ()
+                  | exn -> raise exn)
             ) else (
               IO.return ()
             )

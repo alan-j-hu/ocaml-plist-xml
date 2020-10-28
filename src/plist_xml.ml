@@ -19,85 +19,85 @@ let rec stream plist k =
   and (let^^) state' k =
     match !state' () with
     | Some v ->
-       let^ () = v in
-       (let^^) state' k
+      let^ () = v in
+      (let^^) state' k
     | None -> k ()
   and state =
     ref (fun () ->
         match plist with
         | `Bool true ->
-           let^ () = start "true" in
-           let^ () = `End_element in
-           k state
+          let^ () = start "true" in
+          let^ () = `End_element in
+          k state
         | `Bool false ->
-           let^ () = start "false" in
-           let^ () = `End_element in
-           k state
+          let^ () = start "false" in
+          let^ () = `End_element in
+          k state
         | `Data str ->
-           let^ () = start "data" in
-           let^ () = `Text [Base64.encode_string str] in
-           let^ () = `End_element in
-           k state
+          let^ () = start "data" in
+          let^ () = `Text [Base64.encode_string str] in
+          let^ () = `End_element in
+          k state
         | `Date(timestamp, None) ->
-           let^ () = start "date" in
-           let^ () = `Text [ISO8601.Permissive.string_of_datetime timestamp] in
-           let^ () = `End_element in
-           k state
+          let^ () = start "date" in
+          let^ () = `Text [ISO8601.Permissive.string_of_datetime timestamp] in
+          let^ () = `End_element in
+          k state
         | `Date(timestamp, Some tz) ->
-           let^ () = start "date" in
-           let^ () =
-             `Text
-               [ if tz = 0. then
-                   (* Apple's spec only requires that plists support dates in
-                      the format YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'
+          let^ () = start "date" in
+          let^ () =
+            `Text
+              [ if tz = 0. then
+                  (* Apple's spec only requires that plists support dates in
+                     the format YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'
 
-                      If a Z is parsed from the original input date, the
-                      timezone float should be exactly 0. AFAIK it is correct
-                      to test for float equality in this case. *)
-                   ISO8601.Permissive.string_of_datetime timestamp ^ "Z"
-                 else
-                   ISO8601.Permissive.string_of_datetimezone (timestamp, tz) ]
-           in
-           let^ () = `End_element in
-           k state
+                     If a Z is parsed from the original input date, the
+                     timezone float should be exactly 0. AFAIK it is correct
+                     to test for float equality in this case. *)
+                  ISO8601.Permissive.string_of_datetime timestamp ^ "Z"
+                else
+                  ISO8601.Permissive.string_of_datetimezone (timestamp, tz) ]
+          in
+          let^ () = `End_element in
+          k state
         | `Float f ->
-           let^ () = start "real" in
-           let^ () = `Text [Float.to_string f] in
-           let^ () = `End_element in
-           k state
+          let^ () = start "real" in
+          let^ () = `Text [Float.to_string f] in
+          let^ () = `End_element in
+          k state
         | `Int i ->
-           let^ () = start "integer" in
-           let^ () = `Text [Int.to_string i] in
-           let^ () = `End_element in
-           k state
+          let^ () = start "integer" in
+          let^ () = `Text [Int.to_string i] in
+          let^ () = `End_element in
+          k state
         | `Array xs ->
-           let^ () = start "array" in
-           let rec loop = function
-             | [] ->
-                let^ () = `End_element in
-                k state
-             | x :: xs ->
-                let^^ () = stream x (fun _ -> None) in
-                loop xs
-           in loop xs
+          let^ () = start "array" in
+          let rec loop = function
+            | [] ->
+              let^ () = `End_element in
+              k state
+            | x :: xs ->
+              let^^ () = stream x (fun _ -> None) in
+              loop xs
+          in loop xs
         | `Dict dict ->
-           let^ () = start "dict" in
-           let rec loop = function
-             | [] ->
-                let^ () = `End_element in
-                k state
-             | (k, v) :: kvs ->
-                let^ () = start "key" in
-                let^ () = `Text [k] in
-                let^ () = `End_element in
-                let^^ () = stream v (fun _ -> None) in
-                loop kvs
-           in loop dict
+          let^ () = start "dict" in
+          let rec loop = function
+            | [] ->
+              let^ () = `End_element in
+              k state
+            | (k, v) :: kvs ->
+              let^ () = start "key" in
+              let^ () = `Text [k] in
+              let^ () = `End_element in
+              let^^ () = stream v (fun _ -> None) in
+              loop kvs
+          in loop dict
         | `String str ->
-           let^ () = start "string" in
-           let^ () = `Text [str] in
-           let^ () = `End_element in
-           k state)
+          let^ () = start "string" in
+          let^ () = `Text [str] in
+          let^ () = `End_element in
+          k state)
   in state
 
 let cons v state =
@@ -122,8 +122,8 @@ let signals ?encoding plist =
          (cons (`Start_element(("", "plist"), [("", "version"), "1.0"]))
             (stream plist
                (fun state ->
-                 state := (fun () -> None);
-                 Some `End_element))))
+                  state := (fun () -> None);
+                  Some `End_element))))
   in
   Markup.stream (fun () -> !state ())
 
@@ -191,8 +191,8 @@ let decode_base64 strs =
   let outbuf = Buffer.create 10 in
   let rec loop strs = function
     | `Await ->
-       begin match strs with
-       | str :: strs ->
+      begin match strs with
+        | str :: strs ->
           let buf = Buffer.create (String.length str) in
           String.iter (fun ch ->
               if isn't_whitespace ch then
@@ -200,14 +200,14 @@ let decode_base64 strs =
             ) str;
           M.src decoder (Buffer.to_bytes buf) 0 (Buffer.length buf);
           loop strs (M.decode decoder)
-       | [] ->
+        | [] ->
           M.src decoder (Bytes.create 0) 0 0;
           loop [] (M.decode decoder)
-       end
+      end
     | `End -> Buffer.contents outbuf
     | `Flush str ->
-       Buffer.add_string outbuf str;
-       loop strs (M.decode decoder)
+      Buffer.add_string outbuf str;
+      loop strs (M.decode decoder)
     | `Malformed str -> raise (Parse_error ("Malformed base64: " ^ str))
     | `Wrong_padding -> raise (Parse_error "Base64 wrong padding")
   in loop strs (M.decode decoder)
@@ -238,8 +238,8 @@ module Make (IO : IO) = struct
     let* signal = next stream in
     match signal with
     | Some (`Text strs) ->
-       List.iter check_whitespace strs;
-       skip_whitespace stream
+      List.iter check_whitespace strs;
+      skip_whitespace stream
     | Some #start_or_end as some -> IO.return some
     | None -> IO.return None
 
@@ -247,12 +247,12 @@ module Make (IO : IO) = struct
     let* peeked = IO.peek stream in
     match peeked with
     | Some (`Comment _ | `PI _ | `Doctype _ | `Xml _) ->
-       ignore (IO.next stream);
-       peek_skip_whitespace stream
+      ignore (IO.next stream);
+      peek_skip_whitespace stream
     | Some (`Text strs) ->
-       List.iter check_whitespace strs;
-       ignore (IO.next stream);
-       peek_skip_whitespace stream
+      List.iter check_whitespace strs;
+      ignore (IO.next stream);
+      peek_skip_whitespace stream
     | Some #start_or_end as some -> IO.return some
     | None -> IO.return None
 
@@ -260,128 +260,128 @@ module Make (IO : IO) = struct
     let* peeked = peek_skip_whitespace stream in
     match peeked with
     | Some `End_element ->
-       (* Munch end element *)
-       let* _ = skip_whitespace stream in
-       IO.return (List.rev acc)
+      (* Munch end element *)
+      let* _ = skip_whitespace stream in
+      IO.return (List.rev acc)
     | _ ->
-       let* v = parse_val stream in
-       parse_array (v :: acc) stream
+      let* v = parse_val stream in
+      parse_array (v :: acc) stream
 
   and parse_dict acc stream =
     let* signal = skip_whitespace stream in
     match signal with
     | Some `End_element -> IO.return (List.rev acc)
     | Some (`Start_element((_, "key"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some (`Text [key]) ->
+      let* signal = next stream in
+      begin match signal with
+        | Some (`Text [key]) ->
           let* signal = next stream in
           begin match signal with
-          | Some `End_element ->
-             let* value = parse_val stream in
-             parse_dict ((key, value) :: acc) stream
-          | _ -> expected_closing ()
+            | Some `End_element ->
+              let* value = parse_val stream in
+              parse_dict ((key, value) :: acc) stream
+            | _ -> expected_closing ()
           end
-       | Some (`Text (_ :: _)) ->
+        | Some (`Text (_ :: _)) ->
           raise (Parse_error "Key exceeds max string length")
-       (* Empty key *)
-       | Some `End_element ->
+        (* Empty key *)
+        | Some `End_element ->
           let* value = parse_val stream in
           parse_dict (("", value) :: acc) stream
-       | Some _ -> raise (Parse_error "Expected text inside key")
-       | None -> end_of_doc ()
-       end
+        | Some _ -> raise (Parse_error "Expected text inside key")
+        | None -> end_of_doc ()
+      end
     | Some (`Start_element((_, s), _)) ->
-       raise (Parse_error ("Expected key, got " ^ s))
+      raise (Parse_error ("Expected key, got " ^ s))
     | None -> end_of_doc ()
 
   and parse_val stream =
     let* signal = skip_whitespace stream in
     match signal with
     | Some (`Start_element((_, "array"), _)) ->
-       let* arr = parse_array [] stream in
-       IO.return (`Array arr)
+      let* arr = parse_array [] stream in
+      IO.return (`Array arr)
     | Some (`Start_element((_, "data"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some (`Text strs) -> IO.return (`Data (decode_base64 strs))
-       | _ -> raise (Parse_error "Expected base64-encoded data")
-       end
+      let* signal = next stream in
+      begin match signal with
+        | Some (`Text strs) -> IO.return (`Data (decode_base64 strs))
+        | _ -> raise (Parse_error "Expected base64-encoded data")
+      end
     | Some (`Start_element((_, "date"), _)) ->
-       let* signal = next stream in
+      let* signal = next stream in
        begin match signal with
-       | Some (`Text [str]) ->
+         | Some (`Text [str]) ->
           let* signal = next stream in
           begin match signal with
-          | Some `End_element ->
-             let time, offset =
-               try ISO8601.Permissive.datetime_tz ~reqtime:false str with
-               | Failure msg -> raise (Parse_error msg)
-             in IO.return (`Date(time, offset))
-          | _ -> expected_closing ()
+            | Some `End_element ->
+              let time, offset =
+                try ISO8601.Permissive.datetime_tz ~reqtime:false str with
+                | Failure msg -> raise (Parse_error msg)
+              in IO.return (`Date(time, offset))
+            | _ -> expected_closing ()
           end
-       | _ -> raise (Parse_error "Expected date")
+         | _ -> raise (Parse_error "Expected date")
        end
     | Some (`Start_element((_, "dict"), _)) ->
-       let* dict = parse_dict [] stream in
-       IO.return (`Dict dict)
+      let* dict = parse_dict [] stream in
+      IO.return (`Dict dict)
     | Some (`Start_element((_, "false"), _)) ->
-       let* signal = next stream in
+      let* signal = next stream in
        begin match signal with
-       | Some `End_element -> IO.return (`Bool false)
-       | _ -> expected_closing ()
+         | Some `End_element -> IO.return (`Bool false)
+         | _ -> expected_closing ()
        end
     | Some (`Start_element((_, "integer"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some (`Text [str]) ->
+      let* signal = next stream in
+      begin match signal with
+        | Some (`Text [str]) ->
           let* signal = next stream in
           begin match signal with
-          | Some `End_element ->
-             begin match int_of_string_opt str with
-             | Some int -> IO.return (`Int int)
-             | None -> raise (Parse_error ("Malformed int " ^ str))
-             end
-          | _ -> expected_closing ()
+            | Some `End_element ->
+              begin match int_of_string_opt str with
+                | Some int -> IO.return (`Int int)
+                | None -> raise (Parse_error ("Malformed int " ^ str))
+              end
+            | _ -> expected_closing ()
           end
-       | _ -> raise (Parse_error "Expected int")
-       end
+        | _ -> raise (Parse_error "Expected int")
+      end
     | Some (`Start_element((_, "real"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some (`Text [str]) ->
+      let* signal = next stream in
+      begin match signal with
+        | Some (`Text [str]) ->
           let* signal = next stream in
           begin match signal with
-          | Some `End_element ->
-             begin match Float.of_string_opt str with
-             | Some float -> IO.return (`Float float)
-             | None -> raise (Parse_error ("Malformed float " ^ str))
-             end
-          | _ -> expected_closing ()
+            | Some `End_element ->
+              begin match Float.of_string_opt str with
+                | Some float -> IO.return (`Float float)
+                | None -> raise (Parse_error ("Malformed float " ^ str))
+              end
+            | _ -> expected_closing ()
           end
-       | _ -> raise (Parse_error "Expected float")
-       end
+        | _ -> raise (Parse_error "Expected float")
+      end
     | Some (`Start_element((_, "string"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some (`Text [str]) ->
+      let* signal = next stream in
+      begin match signal with
+        | Some (`Text [str]) ->
           let* signal = next stream in
           begin match signal with
-          | Some `End_element -> IO.return (`String str)
-          | _ -> expected_closing ()
+            | Some `End_element -> IO.return (`String str)
+            | _ -> expected_closing ()
           end
-       (* Empty string *)
-       | Some `End_element -> IO.return (`String "")
-       | _ -> raise (Parse_error "Expected text inside string")
-       end
+        (* Empty string *)
+        | Some `End_element -> IO.return (`String "")
+        | _ -> raise (Parse_error "Expected text inside string")
+      end
     | Some (`Start_element((_, "true"), _)) ->
-       let* signal = next stream in
-       begin match signal with
-       | Some `End_element -> IO.return (`Bool true)
-       | _ -> expected_closing ()
-       end
+      let* signal = next stream in
+      begin match signal with
+        | Some `End_element -> IO.return (`Bool true)
+        | _ -> expected_closing ()
+      end
     | Some (`Start_element((_, start), _)) ->
-       raise (Parse_error ("Got unknown element " ^ start))
+      raise (Parse_error ("Got unknown element " ^ start))
     | Some `End_element -> raise (Parse_error "Got end element")
     | None -> end_of_doc ()
 
@@ -389,12 +389,12 @@ module Make (IO : IO) = struct
     let* signal = skip_whitespace stream in
     match signal with
     | Some (`Start_element((_, "plist"), _)) ->
-       let* ret = parse_val stream in
-       let* signal = skip_whitespace stream in
-       begin match signal with
-       | Some `End_element -> IO.return ret
-       | _ -> expected_closing ()
-       end
+      let* ret = parse_val stream in
+      let* signal = skip_whitespace stream in
+      begin match signal with
+        | Some `End_element -> IO.return ret
+        | _ -> expected_closing ()
+      end
     | _ -> raise (Parse_error "Expected opening plist")
 
   let parse_exn ?report ?encoding ?namespace ?entity ?context s =

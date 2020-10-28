@@ -17,8 +17,7 @@ val signals :
   ?encoding:string -> t -> (Markup.signal, Markup.sync) Markup.stream
 (** Convert a plist into XML signals. *)
 
-exception Parse_error of string
-[@ocaml.warn_on_literal_pattern]
+exception Parse_error of string [@ocaml.warn_on_literal_pattern]
 (** Exception raised upon a parse error. The error message is purely
     informational and you should not pattern match on it, as it is subject to
     change. *)
