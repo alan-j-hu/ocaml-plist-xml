@@ -1,406 +1,230 @@
-type t =
-  [ `Bool of bool
+type signal =
+  [ `Array_start
+  | `Array_end
   | `Data of string
   | `Date of float * float option
-  | `Float of float
+  | `Dict_start
+  | `Dict_end
+  | `False
   | `Int of int
+  | `Key of string
+  | `Real of float
   | `String of string
-  | `Array of t list
-  | `Dict of (string * t) list ]
+  | `True ]
 
-(* [stream] is a hard-coded coroutine. *)
-let rec stream plist k =
-  let start name = `Start_element(("", name), []) in
-  (* yield value *)
-  let rec (let^) value k =
-    state := k;
-    Some value
-  (* repeatedly call state' until it finishes, then continue *)
-  and (let^^) state' k =
-    match !state' () with
-    | Some v ->
-      let^ () = v in
-      (let^^) state' k
-    | None -> k ()
-  and state =
-    ref (fun () ->
-        match plist with
-        | `Bool true ->
-          let^ () = start "true" in
-          let^ () = `End_element in
-          k state
-        | `Bool false ->
-          let^ () = start "false" in
-          let^ () = `End_element in
-          k state
-        | `Data str ->
-          let^ () = start "data" in
-          let^ () = `Text [Base64.encode_string str] in
-          let^ () = `End_element in
-          k state
-        | `Date(timestamp, None) ->
-          let^ () = start "date" in
-          let^ () = `Text [ISO8601.Permissive.string_of_datetime timestamp] in
-          let^ () = `End_element in
-          k state
-        | `Date(timestamp, Some tz) ->
-          let^ () = start "date" in
-          let^ () =
-            `Text
-              [ if tz = 0. then
-                  (* Apple's spec only requires that plists support dates in
-                     the format YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'
+type error =
+  [ `Expected_tag of string
+  | `Expected_start
+  | `Expected_end
+  | `Expected_start_or_end
+  | `Expected_data
+  | `Malformed_base64 of string
+  | `Malformed_date of string
+  | `Malformed_int of string
+  | `Malformed_real of string
+  | `Unknown_tag of string ]
 
-                     If a Z is parsed from the original input date, the
-                     timezone float should be exactly 0. AFAIK it is correct
-                     to test for float equality in this case. *)
-                  ISO8601.Permissive.string_of_datetime timestamp ^ "Z"
-                else
-                  ISO8601.Permissive.string_of_datetimezone (timestamp, tz) ]
-          in
-          let^ () = `End_element in
-          k state
-        | `Float f ->
-          let^ () = start "real" in
-          let^ () = `Text [Float.to_string f] in
-          let^ () = `End_element in
-          k state
-        | `Int i ->
-          let^ () = start "integer" in
-          let^ () = `Text [Int.to_string i] in
-          let^ () = `End_element in
-          k state
-        | `Array xs ->
-          let^ () = start "array" in
-          let rec loop = function
-            | [] ->
-              let^ () = `End_element in
-              k state
-            | x :: xs ->
-              let^^ () = stream x (fun _ -> None) in
-              loop xs
-          in loop xs
-        | `Dict dict ->
-          let^ () = start "dict" in
-          let rec loop = function
-            | [] ->
-              let^ () = `End_element in
-              k state
-            | (k, v) :: kvs ->
-              let^ () = start "key" in
-              let^ () = `Text [k] in
-              let^ () = `End_element in
-              let^^ () = stream v (fun _ -> None) in
-              loop kvs
-          in loop dict
-        | `String str ->
-          let^ () = start "string" in
-          let^ () = `Text [str] in
-          let^ () = `End_element in
-          k state)
-  in state
+exception Error of (int * int) * error
 
-let cons v state =
-  let k = !state in
-  state := (fun () -> state := k; Some v);
-  state
+type decoder = { dec_source : Xmlm.input; dec_sink : signal -> unit }
 
-let signals ?encoding plist =
-  let doctype =
-    { Markup.doctype_name = Some "plist"
-    ; public_identifier = Some "-//Apple//DTD PLIST 1.0//EN"
-    ; system_identifier = None
-    ; raw_text =
-        Some "plist PUBLIC \
-              \"-//Apple//DTD PLIST 1.0//EN\" \
-              \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\""
-    ; force_quirks = false }
+let error_message = function
+  | `Expected_tag tag -> "Expected_tag " ^ tag
+  | `Expected_start -> "Expected_start"
+  | `Expected_end -> "Expected_end"
+  | `Expected_start_or_end -> "Expected_start_or_end"
+  | `Expected_data -> "Expected_data"
+  | `Malformed_base64 s -> "Malformed_base64 " ^ s
+  | `Malformed_date s -> "Malformed_date " ^ s
+  | `Malformed_int s -> "Malformed_int " ^ s
+  | `Malformed_real s -> "Malformed_real " ^ s
+  | `Unknown_tag s -> "Unknown_tag " ^ s
+
+let error decoder error = raise (Error (Xmlm.pos decoder.dec_source, error))
+
+let create_decoder source dec_sink =
+  { dec_source = Xmlm.make_input (`Fun source); dec_sink }
+
+let from_flow ?(buf_size = 256) source =
+  let cstruct = Cstruct.create buf_size in
+  let cursor = ref 0 in
+  let limit = ref 0 in
+  let read () =
+    let n = !cursor in
+    if n < !limit then (
+      cursor := n + 1;
+      Cstruct.get_uint8 cstruct n)
+    else
+      let bytes_read = Eio.Flow.single_read source cstruct in
+      limit := bytes_read;
+      cursor := 1;
+      Cstruct.get_uint8 cstruct 0
   in
-  let state =
-    cons (`Xml Markup.{ version = "1.0"; encoding; standalone = None })
-      (cons (`Doctype doctype)
-         (cons (`Start_element(("", "plist"), [("", "version"), "1.0"]))
-            (stream plist
-               (fun state ->
-                  state := (fun () -> None);
-                  Some `End_element))))
+  let stream = Eio.Stream.create Int.max_int in
+  create_decoder read (Eio.Stream.add stream)
+
+let is_whitespace = function
+  | ' ' | '\x0C' | '\n' | '\r' | '\t' -> true
+  | _ -> false
+
+let all_whitespace = String.for_all is_whitespace
+
+let skip_whitespace decoder =
+  match Xmlm.peek decoder.dec_source with
+  | `Data data when all_whitespace data ->
+    ignore (Xmlm.input decoder.dec_source)
+  | _ -> ()
+
+let lose_whitespace str =
+  let count =
+    String.fold_left
+      (fun count ch -> if is_whitespace ch then count else count + 1)
+      0 str
   in
-  Markup.stream (fun () -> !state ())
+  let fixed = Bytes.create count in
+  let _ =
+    String.fold_left
+      (fun count ch ->
+        if is_whitespace ch then count
+        else (
+          Bytes.set fixed count ch;
+          count + 1))
+      0 str
+  in
+  Bytes.unsafe_to_string fixed
 
-exception Parse_error of string
+let close decoder =
+  match Xmlm.input decoder.dec_source with
+  | `El_end -> ()
+  | _ -> error decoder `Expected_end
 
-let end_of_doc () = raise (Parse_error "End of document")
+let data decoder =
+  match Xmlm.input decoder.dec_source with
+  | `Data data ->
+    close decoder;
+    data
+  | `El_end -> ""
+  | _ -> error decoder `Expected_data
 
-let expected_closing () = raise (Parse_error "Expected closing tag")
+let rec decode_tag decoder = function
+  | "array" ->
+    decoder.dec_sink `Array_start;
+    let rec loop () =
+      skip_whitespace decoder;
+      match Xmlm.input decoder.dec_source with
+      | `El_end -> decoder.dec_sink `Array_end
+      | `El_start ((_, name), _) ->
+        decode_tag decoder name;
+        loop ()
+      | _ -> error decoder `Expected_start_or_end
+    in
+    loop ()
+  | "data" -> (
+    let data = data decoder in
+    match Base64.decode (lose_whitespace data) with
+    | Error _e -> error decoder (`Malformed_base64 data)
+    | Ok data -> decoder.dec_sink (`Data data))
+  | "date" ->
+    let datetime =
+      let data = data decoder in
+      try ISO8601.Permissive.datetime_tz ~reqtime:false data
+      with Failure _ -> error decoder (`Malformed_date data)
+    in
+    decoder.dec_sink (`Date datetime)
+  | "dict" ->
+    decoder.dec_sink `Dict_start;
+    let rec loop () =
+      skip_whitespace decoder;
+      match Xmlm.input decoder.dec_source with
+      | `El_end -> decoder.dec_sink `Dict_end
+      | `El_start ((_, "key"), _) -> (
+        decoder.dec_sink (`Key (data decoder));
+        skip_whitespace decoder;
+        match Xmlm.input decoder.dec_source with
+        | `El_start ((_, name), _) ->
+          decode_tag decoder name;
+          loop ()
+        | _ -> error decoder `Expected_start)
+      | `El_start ((_, _), _) -> error decoder (`Expected_tag "key")
+      | _ -> error decoder `Expected_start_or_end
+    in
+    loop ()
+  | "false" ->
+    close decoder;
+    decoder.dec_sink `False
+  | "integer" -> (
+    let data = data decoder in
+    match int_of_string_opt data with
+    | None -> error decoder (`Malformed_int data)
+    | Some int -> decoder.dec_sink (`Int int))
+  | "real" -> (
+    let data = data decoder in
+    match float_of_string_opt data with
+    | None -> error decoder (`Malformed_real data)
+    | Some float -> decoder.dec_sink (`Real float))
+  | "string" -> decoder.dec_sink (`String (data decoder))
+  | "true" ->
+    close decoder;
+    decoder.dec_sink `True
+  | s -> error decoder (`Unknown_tag s)
 
-module type IO = sig
-  type s
-  type _ io
-  val next : ('a, s) Markup.stream -> 'a option io
-  val peek : ('a, s) Markup.stream -> 'a option io
-  val parse_xml :
-    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
-    ?encoding:Markup.Encoding.t ->
-    ?namespace:(string -> string option) ->
-    ?entity:(string -> string option) ->
-    ?context:[< `Document | `Fragment ] ->
-    (char, s) Markup.stream -> s Markup.parser
-  val bind : 'a io -> ('a -> 'b io) -> 'b io
-  val return : 'a -> 'a io
-end
+let decode decoder =
+  match Xmlm.input decoder.dec_source with
+  | `Dtd _ -> (
+    match Xmlm.input decoder.dec_source with
+    | `El_start ((_, "plist"), _) -> (
+      skip_whitespace decoder;
+      match Xmlm.input decoder.dec_source with
+      | `El_start ((_, name), _) -> decode_tag decoder name
+      | _ -> error decoder `Expected_start)
+    | _ -> error decoder (`Expected_tag "plist"))
+  | _ -> ()
 
-module IO : IO with type s = Markup.sync and type 'a io = 'a = struct
-  type s = Markup.sync
-  type 'a io = 'a
-  let next = Markup.next
-  let peek = Markup.peek
-  let parse_xml ?report ?encoding ?namespace ?entity ?context =
-    Markup.parse_xml ?report ?encoding ?namespace ?entity ?context
-  let bind x f = f x
-  let return x = x
-end
+type encoder = { enc_source : unit -> signal; enc_sink : Xmlm.output }
 
-module type S = sig
-  type s
-  type _ io
+let create_encoder enc_source sink =
+  { enc_source; enc_sink = Xmlm.make_output (`Fun sink) }
 
-  val plist_of_stream_exn :
-    (Markup.signal, s) Markup.stream -> t io
-
-  val parse_exn :
-    ?report:(Markup.location -> Markup.Error.t -> unit io) ->
-    ?encoding:Markup.Encoding.t ->
-    ?namespace:(string -> string option) ->
-    ?entity:(string -> string option) ->
-    ?context:[< `Document | `Fragment ] ->
-    (char, s) Markup.stream -> t io
-end
-
-let isn't_whitespace ch =
-  ch <> ' ' && ch <> '\t' && ch <> '\r' && ch <> '\n'
-
-let check_whitespace =
-  String.iter (fun ch ->
-      if isn't_whitespace ch then
-        raise (Parse_error ("Unexpected character " ^ (String.make 1 ch)))
-    )
-
-let decode_base64 strs =
-  let module M = Base64_rfc2045 in
-  let decoder = M.decoder `Manual in
-  let outbuf = Buffer.create 10 in
-  let rec loop strs = function
-    | `Await ->
-      begin match strs with
-        | str :: strs ->
-          let buf = Buffer.create (String.length str) in
-          String.iter (fun ch ->
-              if isn't_whitespace ch then
-                Buffer.add_char buf ch
-            ) str;
-          M.src decoder (Buffer.to_bytes buf) 0 (Buffer.length buf);
-          loop strs (M.decode decoder)
-        | [] ->
-          M.src decoder (Bytes.create 0) 0 0;
-          loop [] (M.decode decoder)
-      end
-    | `End -> Buffer.contents outbuf
-    | `Flush str ->
-      Buffer.add_string outbuf str;
-      loop strs (M.decode decoder)
-    | `Malformed str -> raise (Parse_error ("Malformed base64: " ^ str))
-    | `Wrong_padding -> raise (Parse_error "Base64 wrong padding")
-  in loop strs (M.decode decoder)
-
-module Make (IO : IO) = struct
-  type s = IO.s
-  type 'a io = 'a IO.io
-
-  let ( let* ) = IO.bind
-
-  type start_or_end =
-    [ `End_element
-    | `Start_element of Markup.name * (Markup.name * string) list ]
-
-  type content_signal =
-    [ `End_element
-    | `Start_element of Markup.name * (Markup.name * string) list
-    | `Text of string list ]
-
-  let rec next stream =
-    let* opt = IO.next stream in
-    match opt with
-    | Some (`Comment _ | `PI _ | `Doctype _ | `Xml _) -> next stream
-    | Some #content_signal as some -> IO.return some
-    | None -> IO.return None
-
-  let rec skip_whitespace stream =
-    let* signal = next stream in
-    match signal with
-    | Some (`Text strs) ->
-      List.iter check_whitespace strs;
-      skip_whitespace stream
-    | Some #start_or_end as some -> IO.return some
-    | None -> IO.return None
-
-  let rec peek_skip_whitespace stream =
-    let* peeked = IO.peek stream in
-    match peeked with
-    | Some (`Comment _ | `PI _ | `Doctype _ | `Xml _) ->
-      ignore (IO.next stream);
-      peek_skip_whitespace stream
-    | Some (`Text strs) ->
-      List.iter check_whitespace strs;
-      ignore (IO.next stream);
-      peek_skip_whitespace stream
-    | Some #start_or_end as some -> IO.return some
-    | None -> IO.return None
-
-  let rec parse_array acc stream =
-    let* peeked = peek_skip_whitespace stream in
-    match peeked with
-    | Some `End_element ->
-      (* Munch end element *)
-      let* _ = skip_whitespace stream in
-      IO.return (List.rev acc)
-    | _ ->
-      let* v = parse_val stream in
-      parse_array (v :: acc) stream
-
-  and parse_dict acc stream =
-    let* signal = skip_whitespace stream in
-    match signal with
-    | Some `End_element -> IO.return (List.rev acc)
-    | Some (`Start_element((_, "key"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some (`Text [key]) ->
-          let* signal = next stream in
-          begin match signal with
-            | Some `End_element ->
-              let* value = parse_val stream in
-              parse_dict ((key, value) :: acc) stream
-            | _ -> expected_closing ()
-          end
-        | Some (`Text (_ :: _)) ->
-          raise (Parse_error "Key exceeds max string length")
-        (* Empty key *)
-        | Some `End_element ->
-          let* value = parse_val stream in
-          parse_dict (("", value) :: acc) stream
-        | Some _ -> raise (Parse_error "Expected text inside key")
-        | None -> end_of_doc ()
-      end
-    | Some (`Start_element((_, s), _)) ->
-      raise (Parse_error ("Expected key, got " ^ s))
-    | None -> end_of_doc ()
-
-  and parse_val stream =
-    let* signal = skip_whitespace stream in
-    match signal with
-    | Some (`Start_element((_, "array"), _)) ->
-      let* arr = parse_array [] stream in
-      IO.return (`Array arr)
-    | Some (`Start_element((_, "data"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some (`Text strs) -> IO.return (`Data (decode_base64 strs))
-        | _ -> raise (Parse_error "Expected base64-encoded data")
-      end
-    | Some (`Start_element((_, "date"), _)) ->
-      let* signal = next stream in
-       begin match signal with
-         | Some (`Text [str]) ->
-          let* signal = next stream in
-          begin match signal with
-            | Some `End_element ->
-              let time, offset =
-                try ISO8601.Permissive.datetime_tz ~reqtime:false str with
-                | Failure msg -> raise (Parse_error msg)
-              in IO.return (`Date(time, offset))
-            | _ -> expected_closing ()
-          end
-         | _ -> raise (Parse_error "Expected date")
-       end
-    | Some (`Start_element((_, "dict"), _)) ->
-      let* dict = parse_dict [] stream in
-      IO.return (`Dict dict)
-    | Some (`Start_element((_, "false"), _)) ->
-      let* signal = next stream in
-       begin match signal with
-         | Some `End_element -> IO.return (`Bool false)
-         | _ -> expected_closing ()
-       end
-    | Some (`Start_element((_, "integer"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some (`Text [str]) ->
-          let* signal = next stream in
-          begin match signal with
-            | Some `End_element ->
-              begin match int_of_string_opt str with
-                | Some int -> IO.return (`Int int)
-                | None -> raise (Parse_error ("Malformed int " ^ str))
-              end
-            | _ -> expected_closing ()
-          end
-        | _ -> raise (Parse_error "Expected int")
-      end
-    | Some (`Start_element((_, "real"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some (`Text [str]) ->
-          let* signal = next stream in
-          begin match signal with
-            | Some `End_element ->
-              begin match Float.of_string_opt str with
-                | Some float -> IO.return (`Float float)
-                | None -> raise (Parse_error ("Malformed float " ^ str))
-              end
-            | _ -> expected_closing ()
-          end
-        | _ -> raise (Parse_error "Expected float")
-      end
-    | Some (`Start_element((_, "string"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some (`Text [str]) ->
-          let* signal = next stream in
-          begin match signal with
-            | Some `End_element -> IO.return (`String str)
-            | _ -> expected_closing ()
-          end
-        (* Empty string *)
-        | Some `End_element -> IO.return (`String "")
-        | _ -> raise (Parse_error "Expected text inside string")
-      end
-    | Some (`Start_element((_, "true"), _)) ->
-      let* signal = next stream in
-      begin match signal with
-        | Some `End_element -> IO.return (`Bool true)
-        | _ -> expected_closing ()
-      end
-    | Some (`Start_element((_, start), _)) ->
-      raise (Parse_error ("Got unknown element " ^ start))
-    | Some `End_element -> raise (Parse_error "Got end element")
-    | None -> end_of_doc ()
-
-  let plist_of_stream_exn stream =
-    let* signal = skip_whitespace stream in
-    match signal with
-    | Some (`Start_element((_, "plist"), _)) ->
-      let* ret = parse_val stream in
-      let* signal = skip_whitespace stream in
-      begin match signal with
-        | Some `End_element -> IO.return ret
-        | _ -> expected_closing ()
-      end
-    | _ -> raise (Parse_error "Expected opening plist")
-
-  let parse_exn ?report ?encoding ?namespace ?entity ?context s =
-    IO.parse_xml ?report ?encoding ?namespace ?entity ?context s
-    |> Markup.signals
-    |> plist_of_stream_exn
-end
-
-include Make(IO)
+let encode encoder = function
+  | `Array_start ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "array"), []))
+  | `Array_end -> Xmlm.output encoder.enc_sink `El_end
+  | `Data data ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "data"), []));
+    let data = Base64.encode_string data in
+    if data <> "" then Xmlm.output encoder.enc_sink (`Data data);
+    Xmlm.output encoder.enc_sink `El_end
+  | `Date (datetime, None) ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "date"), []));
+    Xmlm.output encoder.enc_sink
+      (`Data (ISO8601.Permissive.string_of_datetime datetime));
+    Xmlm.output encoder.enc_sink `El_end
+  | `Date (datetime, Some tz) ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "date"), []));
+    Xmlm.output encoder.enc_sink
+      (`Data (ISO8601.Permissive.string_of_datetimezone (datetime, tz)));
+    Xmlm.output encoder.enc_sink `El_end
+  | `Dict_start -> Xmlm.output encoder.enc_sink (`El_start (("", "dict"), []))
+  | `Dict_end -> Xmlm.output encoder.enc_sink `El_end
+  | `False ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "false"), []));
+    Xmlm.output encoder.enc_sink `El_end
+  | `Int int ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "integer"), []));
+    Xmlm.output encoder.enc_sink (`Data (string_of_int int));
+    Xmlm.output encoder.enc_sink `El_end
+  | `Key key ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "key"), []));
+    if key <> "" then Xmlm.output encoder.enc_sink (`Data key);
+    Xmlm.output encoder.enc_sink `El_end
+  | `Real float ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "integer"), []));
+    Xmlm.output encoder.enc_sink (`Data (string_of_float float));
+    Xmlm.output encoder.enc_sink `El_end
+  | `String data ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "string"), []));
+    if data <> "" then Xmlm.output encoder.enc_sink (`Data data);
+    Xmlm.output encoder.enc_sink `El_end
+  | `True ->
+    Xmlm.output encoder.enc_sink (`El_start (("", "true"), []));
+    Xmlm.output encoder.enc_sink `El_end
