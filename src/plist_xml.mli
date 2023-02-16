@@ -1,4 +1,4 @@
-type signal =
+type lexeme =
   [ `Array_start
   | `Array_end
   | `Data of string
@@ -11,6 +11,8 @@ type signal =
   | `Real of float
   | `String of string
   | `True ]
+
+type signal = [ lexeme | `EOI ]
 
 type error =
   [ `Expected_tag of string
@@ -26,14 +28,6 @@ type error =
 
 exception Error of (int * int) * error
 
-type decoder
-
 val error_message : error -> string
-val create_decoder : (unit -> int) -> (signal -> unit) -> decoder
-val from_flow : ?buf_size:int -> #Eio.Flow.source -> decoder
-val decode : decoder -> unit
-
-type encoder
-
-val create_encoder : (unit -> signal) -> (int -> unit) -> encoder
-val encode : encoder -> signal -> unit
+val decode : (unit -> int) -> (signal -> unit) -> unit
+val encode : (unit -> signal) -> (int -> unit) -> unit

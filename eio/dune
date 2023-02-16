@@ -1,0 +1,3 @@
+(library
+ (name plist_xml_eio)
+ (libraries eio plist_xml))

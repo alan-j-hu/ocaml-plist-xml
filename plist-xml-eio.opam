@@ -15,10 +15,9 @@ doc: "https://alan-j-hu.github.io/ocaml-plist-xml/"
 bug-reports: "https://github.com/alan-j-hu/ocaml-plist-xml/issues"
 depends: [
   "dune" {>= "2.7"}
-  "base64" {>= "3.4" & < "4.0"}
-  "cstruct" {>= "6.1"}
-  "ISO8601" {>= "0.2.6" & < "0.3"}
-  "xmlm" {>= "1.4" & < "2.0"}
+  "eio" {>= "0.7" & < "0.8"}
+  "eio_main" {>= "0.7" & < "0.8" & with-test}
+  "plist-xml" {= version}
   "odoc" {with-doc}
 ]
 build: [

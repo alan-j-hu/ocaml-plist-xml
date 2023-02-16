@@ -1,4 +1,4 @@
-type signal =
+type lexeme =
   [ `Array_start
   | `Array_end
   | `Data of string
@@ -11,6 +11,8 @@ type signal =
   | `Real of float
   | `String of string
   | `True ]
+
+type signal = [ lexeme | `EOI ]
 
 type error =
   [ `Expected_tag of string
@@ -44,24 +46,6 @@ let error decoder error = raise (Error (Xmlm.pos decoder.dec_source, error))
 
 let create_decoder source dec_sink =
   { dec_source = Xmlm.make_input (`Fun source); dec_sink }
-
-let from_flow ?(buf_size = 256) source =
-  let cstruct = Cstruct.create buf_size in
-  let cursor = ref 0 in
-  let limit = ref 0 in
-  let read () =
-    let n = !cursor in
-    if n < !limit then (
-      cursor := n + 1;
-      Cstruct.get_uint8 cstruct n)
-    else
-      let bytes_read = Eio.Flow.single_read source cstruct in
-      limit := bytes_read;
-      cursor := 1;
-      Cstruct.get_uint8 cstruct 0
-  in
-  let stream = Eio.Stream.create Int.max_int in
-  create_decoder read (Eio.Stream.add stream)
 
 let is_whitespace = function
   | ' ' | '\x0C' | '\n' | '\r' | '\t' -> true
@@ -175,56 +159,74 @@ let decode decoder =
     | `El_start ((_, "plist"), _) -> (
       skip_whitespace decoder;
       match Xmlm.input decoder.dec_source with
-      | `El_start ((_, name), _) -> decode_tag decoder name
+      | `El_start ((_, name), _) ->
+        decode_tag decoder name;
+        decoder.dec_sink `EOI
       | _ -> error decoder `Expected_start)
     | _ -> error decoder (`Expected_tag "plist"))
   | _ -> ()
+
+let decode source sink =
+  let decoder = create_decoder source sink in
+  decode decoder
 
 type encoder = { enc_source : unit -> signal; enc_sink : Xmlm.output }
 
 let create_encoder enc_source sink =
   { enc_source; enc_sink = Xmlm.make_output (`Fun sink) }
 
-let encode encoder = function
-  | `Array_start ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "array"), []))
-  | `Array_end -> Xmlm.output encoder.enc_sink `El_end
+let encode sink = function
+  | `Array_start -> Xmlm.output sink (`El_start (("", "array"), []))
+  | `Array_end -> Xmlm.output sink `El_end
   | `Data data ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "data"), []));
+    Xmlm.output sink (`El_start (("", "data"), []));
     let data = Base64.encode_string data in
-    if data <> "" then Xmlm.output encoder.enc_sink (`Data data);
-    Xmlm.output encoder.enc_sink `El_end
+    if data <> "" then Xmlm.output sink (`Data data);
+    Xmlm.output sink `El_end
   | `Date (datetime, None) ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "date"), []));
-    Xmlm.output encoder.enc_sink
-      (`Data (ISO8601.Permissive.string_of_datetime datetime));
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "date"), []));
+    Xmlm.output sink (`Data (ISO8601.Permissive.string_of_datetime datetime));
+    Xmlm.output sink `El_end
   | `Date (datetime, Some tz) ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "date"), []));
-    Xmlm.output encoder.enc_sink
+    Xmlm.output sink (`El_start (("", "date"), []));
+    Xmlm.output sink
       (`Data (ISO8601.Permissive.string_of_datetimezone (datetime, tz)));
-    Xmlm.output encoder.enc_sink `El_end
-  | `Dict_start -> Xmlm.output encoder.enc_sink (`El_start (("", "dict"), []))
-  | `Dict_end -> Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink `El_end
+  | `Dict_start -> Xmlm.output sink (`El_start (("", "dict"), []))
+  | `Dict_end -> Xmlm.output sink `El_end
   | `False ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "false"), []));
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "false"), []));
+    Xmlm.output sink `El_end
   | `Int int ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "integer"), []));
-    Xmlm.output encoder.enc_sink (`Data (string_of_int int));
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "integer"), []));
+    Xmlm.output sink (`Data (string_of_int int));
+    Xmlm.output sink `El_end
   | `Key key ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "key"), []));
-    if key <> "" then Xmlm.output encoder.enc_sink (`Data key);
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "key"), []));
+    if key <> "" then Xmlm.output sink (`Data key);
+    Xmlm.output sink `El_end
   | `Real float ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "integer"), []));
-    Xmlm.output encoder.enc_sink (`Data (string_of_float float));
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "integer"), []));
+    Xmlm.output sink (`Data (string_of_float float));
+    Xmlm.output sink `El_end
   | `String data ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "string"), []));
-    if data <> "" then Xmlm.output encoder.enc_sink (`Data data);
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "string"), []));
+    if data <> "" then Xmlm.output sink (`Data data);
+    Xmlm.output sink `El_end
   | `True ->
-    Xmlm.output encoder.enc_sink (`El_start (("", "true"), []));
-    Xmlm.output encoder.enc_sink `El_end
+    Xmlm.output sink (`El_start (("", "true"), []));
+    Xmlm.output sink `El_end
+
+let encode source sink =
+  let encoder = create_encoder source sink in
+  Xmlm.output encoder.enc_sink (`Dtd None);
+  Xmlm.output encoder.enc_sink (`El_start (("", "plist"), []));
+  let rec loop () =
+    match encoder.enc_source () with
+    | `EOI -> ()
+    | #lexeme as lexeme ->
+      encode encoder.enc_sink lexeme;
+      loop ()
+  in
+  loop ();
+  Xmlm.output encoder.enc_sink `El_end
