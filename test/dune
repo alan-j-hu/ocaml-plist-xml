@@ -1,7 +1,7 @@
 (test
  (name test)
- (package plist-xml-eio)
+ (package plist-xml)
  (deps
   (glob_files pass/*.plist)
   (glob_files fail/*.plist))
- (libraries eio_main plist_xml plist_xml_eio))
+ (libraries eio_main plist_xml))

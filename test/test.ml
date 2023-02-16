@@ -14,9 +14,11 @@ let run_tests subdir f =
 let () =
   try
     run_tests "pass" @@ fun flow ->
-    let source = Plist_xml_eio.source flow in
     let stream = Eio.Stream.create Int.max_int in
-    Plist_xml.decode source (Eio.Stream.add stream);
+    (let in_buf = Eio.Buf_read.of_flow ~max_size:256 flow in
+     Plist_xml.decode
+       (fun () -> Eio.Buf_read.uint8 in_buf)
+       (Eio.Stream.add stream));
     let buffer = Buffer.create 256 in
     let sink = Eio.Flow.buffer_sink buffer in
     ( Eio.Buf_write.with_flow sink @@ fun out_buf ->
@@ -33,9 +35,18 @@ let () =
 let () =
   run_tests "fail" @@ fun flow ->
   try
-    let source = Plist_xml_eio.source flow in
     let stream = Eio.Stream.create Int.max_int in
-    Plist_xml.decode source (Eio.Stream.add stream)
+    (let in_buf = Eio.Buf_read.of_flow ~max_size:256 flow in
+     Plist_xml.decode
+       (fun () -> Eio.Buf_read.uint8 in_buf)
+       (Eio.Stream.add stream));
+    let buffer = Buffer.create 256 in
+    let sink = Eio.Flow.buffer_sink buffer in
+    ( Eio.Buf_write.with_flow sink @@ fun out_buf ->
+      Plist_xml.encode
+        (fun () -> Eio.Stream.take stream)
+        (Eio.Buf_write.uint8 out_buf) );
+    Eio.Std.traceln "%s" (Buffer.contents buffer)
   with
   | Plist_xml.Error ((_, _), _) -> ()
   | Xmlm.Error ((_, _), _) -> ()

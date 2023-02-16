@@ -19,6 +19,8 @@ depends: [
   "cstruct" {>= "6.1"}
   "ISO8601" {>= "0.2.6" & < "0.3"}
   "xmlm" {>= "1.4" & < "2.0"}
+  "eio" {>= "0.7" & with-test}
+  "eio_main" {>= "0.7" & with-test}
   "odoc" {with-doc}
 ]
 build: [
