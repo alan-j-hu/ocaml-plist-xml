@@ -154,7 +154,8 @@ let rec decode_tag decoder = function
     decoder.dec_sink `True
   | s -> error decoder (`Unknown_tag s)
 
-let decode decoder =
+let decode source sink =
+  let decoder = create_decoder source sink in
   match Xmlm.input decoder.dec_source with
   | `Dtd _ -> (
     match Xmlm.input decoder.dec_source with
@@ -170,10 +171,6 @@ let decode decoder =
       | _ -> error decoder `Expected_start)
     | _ -> error decoder (`Expected_tag "plist"))
   | _ -> ()
-
-let decode source sink =
-  let decoder = create_decoder source sink in
-  decode decoder
 
 type encoder = { enc_source : unit -> signal; enc_sink : Xmlm.output }
 
@@ -261,7 +258,7 @@ let parse source =
       | I.InputNeeded _ as checkpoint' -> checkpoint := checkpoint'
       | (I.Shifting _ | I.AboutToReduce _) as checkpoint ->
         loop (I.resume checkpoint)
-      | I.HandlingError _ -> failwith ""
+      | I.HandlingError _ -> assert false
       | I.Accepted v -> raise (E v)
       | I.Rejected -> assert false
     in
@@ -273,3 +270,5 @@ let parse source =
     decode source sink;
     assert false
   with E v -> v
+
+let of_channel in_channel = parse (fun () -> input_byte in_channel)
