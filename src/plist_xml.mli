@@ -16,6 +16,7 @@ exception Error of (int * int) * error
 
 val error_message : error -> string
 val of_channel : in_channel -> t
+val of_string : string -> t
 val parse : (unit -> int) -> t
 
 type lexeme =

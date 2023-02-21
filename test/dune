@@ -15,3 +15,12 @@
   (glob_files fail/*.plist))
  (libraries eio_main plist_xml)
  (modules test_eio))
+
+(test
+ (name test_string)
+ (package plist-xml)
+ (deps
+  (glob_files pass/*.plist)
+  (glob_files fail/*.plist))
+ (libraries plist_xml)
+ (modules test_string))

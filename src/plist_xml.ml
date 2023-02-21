@@ -272,3 +272,14 @@ let parse source =
   with E v -> v
 
 let of_channel in_channel = parse (fun () -> input_byte in_channel)
+
+let of_string string =
+  let idx = ref 0 in
+  let source () =
+    let i = !idx in
+    if i >= String.length string then raise End_of_file
+    else (
+      idx := i + 1;
+      Char.code string.[i])
+  in
+  parse source
