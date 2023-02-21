@@ -1,5 +1,5 @@
 (test
- (name test)
+ (name test_eio)
  (package plist-xml)
  (deps
   (glob_files pass/*.plist)

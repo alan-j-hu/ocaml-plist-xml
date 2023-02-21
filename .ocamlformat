@@ -3,6 +3,7 @@ ocaml-version=5.0.0
 break-cases=toplevel
 break-separators=after
 cases-exp-indent=2
+doc-comments-padding=1
 margin=79
 dock-collection-brackets
 space-around-records

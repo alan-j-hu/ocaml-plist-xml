@@ -1,4 +1,5 @@
 (lang dune 2.7)
+(using menhir 2.0)
 (name plist-xml)
 (version 0.3.0)
 (documentation https://alan-j-hu.github.io/ocaml-plist-xml/)
@@ -18,9 +19,10 @@
 
 Implementation of https://www.apple.com/DTDs/PropertyList-1.0.dtd.")
  (depends
-  (base64 (and (>= 3.4) (< 4.0)))
+  (base64 (>= 3.4))
   (cstruct (>= 6.1))
-  (ISO8601 (and (>= 0.2.6) (< 0.3)))
-  (xmlm (and (>= 1.4) (< 2.0)))
+  (ISO8601 (>= 0.2.6))
+  (menhir (>= 20220210))
+  (xmlm (>= 1.4))
   (eio (and (>= 0.7) :with-test))
   (eio_main (and (>= 0.7) :with-test))))

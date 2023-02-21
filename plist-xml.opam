@@ -15,10 +15,11 @@ doc: "https://alan-j-hu.github.io/ocaml-plist-xml/"
 bug-reports: "https://github.com/alan-j-hu/ocaml-plist-xml/issues"
 depends: [
   "dune" {>= "2.7"}
-  "base64" {>= "3.4" & < "4.0"}
+  "base64" {>= "3.4"}
   "cstruct" {>= "6.1"}
-  "ISO8601" {>= "0.2.6" & < "0.3"}
-  "xmlm" {>= "1.4" & < "2.0"}
+  "ISO8601" {>= "0.2.6"}
+  "menhir" {>= "20220210"}
+  "xmlm" {>= "1.4"}
   "eio" {>= "0.7" & with-test}
   "eio_main" {>= "0.7" & with-test}
   "odoc" {with-doc}

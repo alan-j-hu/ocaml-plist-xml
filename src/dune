@@ -1,3 +1,7 @@
 (library
  (name plist_xml)
- (libraries base64 cstruct ISO8601 xmlm))
+ (libraries base64 cstruct ISO8601 menhirLib xmlm))
+
+(menhir
+ (modules parser)
+ (flags --table))

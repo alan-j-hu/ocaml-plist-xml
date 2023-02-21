@@ -1,3 +1,5 @@
+include module type of Common
+
 type lexeme =
   [ `Array_start
   | `Array_end
@@ -31,3 +33,4 @@ exception Error of (int * int) * error
 val error_message : error -> string
 val decode : (unit -> int) -> (signal -> unit) -> unit
 val encode : (unit -> signal) -> (int -> unit) -> unit
+val parse : (unit -> int) -> t

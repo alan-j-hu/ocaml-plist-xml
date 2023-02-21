@@ -1,3 +1,5 @@
+include Common
+
 type lexeme =
   [ `Array_start
   | `Array_end
@@ -159,9 +161,12 @@ let decode decoder =
     | `El_start ((_, "plist"), _) -> (
       skip_whitespace decoder;
       match Xmlm.input decoder.dec_source with
-      | `El_start ((_, name), _) ->
+      | `El_start ((_, name), _) -> (
         decode_tag decoder name;
-        decoder.dec_sink `EOI
+        skip_whitespace decoder;
+        match Xmlm.input decoder.dec_source with
+        | `El_end -> decoder.dec_sink `EOI
+        | _ -> error decoder `Expected_end)
       | _ -> error decoder `Expected_start)
     | _ -> error decoder (`Expected_tag "plist"))
   | _ -> ()
@@ -230,3 +235,41 @@ let encode source sink =
   in
   loop ();
   Xmlm.output encoder.enc_sink `El_end
+
+let token_of_signal = function
+  | `Array_start -> Parser.ARRAY_START
+  | `Array_end -> Parser.ARRAY_END
+  | `Data str -> Parser.DATA str
+  | `Date date -> Parser.DATE date
+  | `Dict_start -> Parser.DICT_START
+  | `Dict_end -> Parser.DICT_END
+  | `False -> Parser.FALSE
+  | `Int int -> Parser.INT int
+  | `Key key -> Parser.KEY key
+  | `Real float -> Parser.REAL float
+  | `String str -> Parser.STRING str
+  | `True -> Parser.TRUE
+  | `EOI -> Parser.EOI
+
+module I = Parser.MenhirInterpreter
+
+let parse source =
+  let exception E of t in
+  let checkpoint = ref (Parser.Incremental.main Lexing.dummy_pos) in
+  let sink signal =
+    let rec loop = function
+      | I.InputNeeded _ as checkpoint' -> checkpoint := checkpoint'
+      | (I.Shifting _ | I.AboutToReduce _) as checkpoint ->
+        loop (I.resume checkpoint)
+      | I.HandlingError _ -> failwith ""
+      | I.Accepted v -> raise (E v)
+      | I.Rejected -> assert false
+    in
+    loop
+      (I.offer !checkpoint
+         (token_of_signal signal, Lexing.dummy_pos, Lexing.dummy_pos))
+  in
+  try
+    decode source sink;
+    assert false
+  with E v -> v
