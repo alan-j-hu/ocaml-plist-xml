@@ -19,6 +19,7 @@ depends: [
   "cstruct" {>= "6.1"}
   "ISO8601" {>= "0.2.6"}
   "menhir" {>= "20220210"}
+  "ocaml" {>= "4.13"}
   "xmlm" {>= "1.4"}
   "eio" {>= "0.7" & with-test}
   "eio_main" {>= "0.7" & with-test}

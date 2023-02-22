@@ -7,3 +7,4 @@ type t =
   | `String of string
   | `Array of t list (** Array *)
   | `Dict of (string * t) list (** Dictionary *) ]
+(** Plist values. *)

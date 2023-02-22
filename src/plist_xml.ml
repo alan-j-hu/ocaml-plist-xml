@@ -1,4 +1,6 @@
-include Common
+include Plist_tree
+include Token
+include Error
 
 let dtd =
   {|<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">|}
@@ -15,36 +17,6 @@ let key_start_signal = `El_start (("", "key"), [])
 let real_start_signal = `El_start (("", "real"), [])
 let string_start_signal = `El_start (("", "string"), [])
 let true_start_signal = `El_start (("", "true"), [])
-
-type lexeme =
-  [ `Array_start
-  | `Array_end
-  | `Data of string
-  | `Date of float * float option
-  | `Dict_start
-  | `Dict_end
-  | `False
-  | `Int of int
-  | `Key of string
-  | `Real of float
-  | `String of string
-  | `True ]
-
-type signal = [ lexeme | `EOI ]
-
-type error =
-  [ `Expected_tag of string
-  | `Expected_start
-  | `Expected_end
-  | `Expected_start_or_end
-  | `Expected_data
-  | `Malformed_base64 of string
-  | `Malformed_date of string
-  | `Malformed_int of string
-  | `Malformed_real of string
-  | `Unknown_tag of string ]
-
-exception Error of (int * int) * error
 
 let error_message = function
   | `Expected_tag tag -> "Expected_tag " ^ tag
@@ -182,7 +154,7 @@ let decode source sink =
     | _ -> error input (`Expected_tag "plist"))
   | _ -> ()
 
-let encode_lexeme output = function
+let encode_token output = function
   | `Array_start -> Xmlm.output output array_start_signal
   | `Array_end -> Xmlm.output output `El_end
   | `Data data ->
@@ -231,8 +203,8 @@ let encode source sink =
   let rec loop () =
     match source () with
     | `EOI -> ()
-    | #lexeme as lexeme ->
-      encode_lexeme output lexeme;
+    | #token as token ->
+      encode_token output token;
       loop ()
   in
   loop ();
@@ -289,7 +261,7 @@ let of_string string =
   in
   parse source
 
-let rec lexemes sink = function
+let rec tokens sink = function
   | `Bool false -> sink `False
   | `Bool true -> sink `True
   | `Data data -> sink (`Data data)
@@ -299,14 +271,14 @@ let rec lexemes sink = function
   | `String string -> sink (`String string)
   | `Array elts ->
     sink `Array_start;
-    List.iter (lexemes sink) elts;
+    List.iter (tokens sink) elts;
     sink `Array_end
   | `Dict kvs ->
     sink `Dict_start;
     List.iter
       (fun (k, v) ->
         sink (`Key k);
-        lexemes sink v)
+        tokens sink v)
       kvs;
     sink `Dict_end
 
@@ -314,7 +286,7 @@ let print sink t =
   let output = Xmlm.make_output (`Fun sink) in
   Xmlm.output output dtd_signal;
   Xmlm.output output plist_start_signal;
-  lexemes (encode_lexeme output) t;
+  tokens (encode_token output) t;
   Xmlm.output output `El_end
 
 let to_buffer buffer = print (Buffer.add_uint8 buffer)

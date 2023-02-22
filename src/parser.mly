@@ -12,7 +12,7 @@
 %token TRUE
 %token EOI
 
-%start <Common.t> main
+%start <Plist_tree.t> main
 
 %%
 
