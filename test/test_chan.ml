@@ -23,6 +23,17 @@ let () =
   assert (
     read "pass/array.plist" = `Dict [ ("mybools", `Array [ `Bool false ]) ]);
   assert (
+    read "pass/base64.plist"
+    = `Dict
+        [
+          ( "data",
+            `Data
+              "Four score and seven years ago our fathers brought forth on \
+               this continent, a new nation, conceived in Liberty, and \
+               dedicated to the proposition that all men are created equal.\n"
+          );
+        ]);
+  assert (
     read "pass/bool_dict.plist"
     = `Dict [ ("true", `Bool true); ("false", `Bool false) ]);
   assert (read "pass/emptydict.plist" = `Dict []);
