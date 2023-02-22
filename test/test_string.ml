@@ -38,3 +38,5 @@ let () =
 |});
     assert false
   with Xmlm.Error _ -> ()
+
+let () = Plist_xml.to_channel stdout (`Dict [])

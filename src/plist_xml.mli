@@ -18,6 +18,10 @@ val error_message : error -> string
 val of_channel : in_channel -> t
 val of_string : string -> t
 val parse : (unit -> int) -> t
+val to_buffer : Buffer.t -> t -> unit
+val to_channel : out_channel -> t -> unit
+val to_string : t -> string
+val print : (int -> unit) -> t -> unit
 
 type lexeme =
   [ `Array_start
@@ -37,3 +41,4 @@ type signal = [ lexeme | `EOI ]
 
 val decode : (unit -> int) -> (signal -> unit) -> unit
 val encode : (unit -> signal) -> (int -> unit) -> unit
+val lexemes : (lexeme -> unit) -> t -> unit

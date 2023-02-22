@@ -1,5 +1,21 @@
 include Common
 
+let dtd =
+  {|<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">|}
+
+let dtd_signal = `Dtd (Some dtd)
+let plist_start_signal = `El_start (("", "plist"), [])
+let array_start_signal = `El_start (("", "array"), [])
+let data_start_signal = `El_start (("", "data"), [])
+let date_start_signal = `El_start (("", "date"), [])
+let dict_start_signal = `El_start (("", "dict"), [])
+let false_start_signal = `El_start (("", "false"), [])
+let integer_start_signal = `El_start (("", "integer"), [])
+let key_start_signal = `El_start (("", "key"), [])
+let real_start_signal = `El_start (("", "real"), [])
+let string_start_signal = `El_start (("", "string"), [])
+let true_start_signal = `El_start (("", "true"), [])
+
 type lexeme =
   [ `Array_start
   | `Array_end
@@ -177,57 +193,57 @@ type encoder = { enc_source : unit -> signal; enc_sink : Xmlm.output }
 let create_encoder enc_source sink =
   { enc_source; enc_sink = Xmlm.make_output (`Fun sink) }
 
-let encode sink = function
-  | `Array_start -> Xmlm.output sink (`El_start (("", "array"), []))
+let encode_lexeme sink = function
+  | `Array_start -> Xmlm.output sink array_start_signal
   | `Array_end -> Xmlm.output sink `El_end
   | `Data data ->
-    Xmlm.output sink (`El_start (("", "data"), []));
+    Xmlm.output sink data_start_signal;
     let data = Base64.encode_string data in
     if data <> "" then Xmlm.output sink (`Data data);
     Xmlm.output sink `El_end
   | `Date (datetime, None) ->
-    Xmlm.output sink (`El_start (("", "date"), []));
+    Xmlm.output sink date_start_signal;
     Xmlm.output sink (`Data (ISO8601.Permissive.string_of_datetime datetime));
     Xmlm.output sink `El_end
   | `Date (datetime, Some tz) ->
-    Xmlm.output sink (`El_start (("", "date"), []));
+    Xmlm.output sink date_start_signal;
     Xmlm.output sink
       (`Data (ISO8601.Permissive.string_of_datetimezone (datetime, tz)));
     Xmlm.output sink `El_end
-  | `Dict_start -> Xmlm.output sink (`El_start (("", "dict"), []))
+  | `Dict_start -> Xmlm.output sink dict_start_signal
   | `Dict_end -> Xmlm.output sink `El_end
   | `False ->
-    Xmlm.output sink (`El_start (("", "false"), []));
+    Xmlm.output sink false_start_signal;
     Xmlm.output sink `El_end
   | `Int int ->
-    Xmlm.output sink (`El_start (("", "integer"), []));
+    Xmlm.output sink integer_start_signal;
     Xmlm.output sink (`Data (string_of_int int));
     Xmlm.output sink `El_end
   | `Key key ->
-    Xmlm.output sink (`El_start (("", "key"), []));
+    Xmlm.output sink key_start_signal;
     if key <> "" then Xmlm.output sink (`Data key);
     Xmlm.output sink `El_end
   | `Real float ->
-    Xmlm.output sink (`El_start (("", "integer"), []));
+    Xmlm.output sink real_start_signal;
     Xmlm.output sink (`Data (string_of_float float));
     Xmlm.output sink `El_end
   | `String data ->
-    Xmlm.output sink (`El_start (("", "string"), []));
+    Xmlm.output sink string_start_signal;
     if data <> "" then Xmlm.output sink (`Data data);
     Xmlm.output sink `El_end
   | `True ->
-    Xmlm.output sink (`El_start (("", "true"), []));
+    Xmlm.output sink true_start_signal;
     Xmlm.output sink `El_end
 
 let encode source sink =
   let encoder = create_encoder source sink in
-  Xmlm.output encoder.enc_sink (`Dtd None);
+  Xmlm.output encoder.enc_sink dtd_signal;
   Xmlm.output encoder.enc_sink (`El_start (("", "plist"), []));
   let rec loop () =
     match encoder.enc_source () with
     | `EOI -> ()
     | #lexeme as lexeme ->
-      encode encoder.enc_sink lexeme;
+      encode_lexeme encoder.enc_sink lexeme;
       loop ()
   in
   loop ();
@@ -283,3 +299,39 @@ let of_string string =
       Char.code string.[i])
   in
   parse source
+
+let rec lexemes sink = function
+  | `Bool false -> sink `False
+  | `Bool true -> sink `True
+  | `Data data -> sink (`Data data)
+  | `Date date -> sink (`Date date)
+  | `Float float -> sink (`Real float)
+  | `Int int -> sink (`Int int)
+  | `String string -> sink (`String string)
+  | `Array elts ->
+    sink `Array_start;
+    List.iter (lexemes sink) elts;
+    sink `Array_end
+  | `Dict kvs ->
+    sink `Dict_start;
+    List.iter
+      (fun (k, v) ->
+        sink (`Key k);
+        lexemes sink v)
+      kvs;
+    sink `Dict_end
+
+let print sink t =
+  let output = Xmlm.make_output (`Fun sink) in
+  Xmlm.output output dtd_signal;
+  Xmlm.output output plist_start_signal;
+  lexemes (encode_lexeme output) t;
+  Xmlm.output output `El_end
+
+let to_buffer buffer = print (Buffer.add_uint8 buffer)
+let to_channel out_channel = print (output_byte out_channel)
+
+let to_string t =
+  let buffer = Buffer.create 512 in
+  to_buffer buffer t;
+  Buffer.contents buffer
