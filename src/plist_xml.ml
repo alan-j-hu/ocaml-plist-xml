@@ -46,8 +46,6 @@ type error =
 
 exception Error of (int * int) * error
 
-type decoder = { dec_source : Xmlm.input; dec_sink : signal -> unit }
-
 let error_message = function
   | `Expected_tag tag -> "Expected_tag " ^ tag
   | `Expected_start -> "Expected_start"
@@ -60,10 +58,7 @@ let error_message = function
   | `Malformed_real s -> "Malformed_real " ^ s
   | `Unknown_tag s -> "Unknown_tag " ^ s
 
-let error decoder error = raise (Error (Xmlm.pos decoder.dec_source, error))
-
-let create_decoder source dec_sink =
-  { dec_source = Xmlm.make_input (`Fun source); dec_sink }
+let error input error = raise (Error (Xmlm.pos input, error))
 
 let is_whitespace = function
   | ' ' | '\x0C' | '\n' | '\r' | '\t' -> true
@@ -71,10 +66,9 @@ let is_whitespace = function
 
 let all_whitespace = String.for_all is_whitespace
 
-let skip_whitespace decoder =
-  match Xmlm.peek decoder.dec_source with
-  | `Data data when all_whitespace data ->
-    ignore (Xmlm.input decoder.dec_source)
+let skip_whitespace input =
+  match Xmlm.peek input with
+  | `Data data when all_whitespace data -> ignore (Xmlm.input input)
   | _ -> ()
 
 let lose_whitespace str =
@@ -95,159 +89,154 @@ let lose_whitespace str =
   in
   Bytes.unsafe_to_string fixed
 
-let close decoder =
-  match Xmlm.input decoder.dec_source with
+let close input =
+  match Xmlm.input input with
   | `El_end -> ()
-  | _ -> error decoder `Expected_end
+  | _ -> error input `Expected_end
 
-let data decoder =
-  match Xmlm.input decoder.dec_source with
+let data input =
+  match Xmlm.input input with
   | `Data data ->
-    close decoder;
+    close input;
     data
   | `El_end -> ""
-  | _ -> error decoder `Expected_data
+  | _ -> error input `Expected_data
 
-let rec decode_tag decoder = function
+let rec decode_tag input sink = function
   | "array" ->
-    decoder.dec_sink `Array_start;
+    sink `Array_start;
     let rec loop () =
-      skip_whitespace decoder;
-      match Xmlm.input decoder.dec_source with
-      | `El_end -> decoder.dec_sink `Array_end
+      skip_whitespace input;
+      match Xmlm.input input with
+      | `El_end -> sink `Array_end
       | `El_start ((_, name), _) ->
-        decode_tag decoder name;
+        decode_tag input sink name;
         loop ()
-      | _ -> error decoder `Expected_start_or_end
+      | _ -> error input `Expected_start_or_end
     in
     loop ()
   | "data" -> (
-    let data = data decoder in
+    let data = data input in
     match Base64.decode (lose_whitespace data) with
-    | Error _e -> error decoder (`Malformed_base64 data)
-    | Ok data -> decoder.dec_sink (`Data data))
+    | Error _e -> error input (`Malformed_base64 data)
+    | Ok data -> sink (`Data data))
   | "date" ->
     let datetime =
-      let data = data decoder in
+      let data = data input in
       try ISO8601.Permissive.datetime_tz ~reqtime:false data
-      with Failure _ -> error decoder (`Malformed_date data)
+      with Failure _ -> error input (`Malformed_date data)
     in
-    decoder.dec_sink (`Date datetime)
+    sink (`Date datetime)
   | "dict" ->
-    decoder.dec_sink `Dict_start;
+    sink `Dict_start;
     let rec loop () =
-      skip_whitespace decoder;
-      match Xmlm.input decoder.dec_source with
-      | `El_end -> decoder.dec_sink `Dict_end
+      skip_whitespace input;
+      match Xmlm.input input with
+      | `El_end -> sink `Dict_end
       | `El_start ((_, "key"), _) -> (
-        decoder.dec_sink (`Key (data decoder));
-        skip_whitespace decoder;
-        match Xmlm.input decoder.dec_source with
+        sink (`Key (data input));
+        skip_whitespace input;
+        match Xmlm.input input with
         | `El_start ((_, name), _) ->
-          decode_tag decoder name;
+          decode_tag input sink name;
           loop ()
-        | _ -> error decoder `Expected_start)
-      | `El_start ((_, _), _) -> error decoder (`Expected_tag "key")
-      | _ -> error decoder `Expected_start_or_end
+        | _ -> error input `Expected_start)
+      | `El_start ((_, _), _) -> error input (`Expected_tag "key")
+      | _ -> error input `Expected_start_or_end
     in
     loop ()
   | "false" ->
-    close decoder;
-    decoder.dec_sink `False
+    close input;
+    sink `False
   | "integer" -> (
-    let data = data decoder in
+    let data = data input in
     match int_of_string_opt data with
-    | None -> error decoder (`Malformed_int data)
-    | Some int -> decoder.dec_sink (`Int int))
+    | None -> error input (`Malformed_int data)
+    | Some int -> sink (`Int int))
   | "real" -> (
-    let data = data decoder in
+    let data = data input in
     match float_of_string_opt data with
-    | None -> error decoder (`Malformed_real data)
-    | Some float -> decoder.dec_sink (`Real float))
-  | "string" -> decoder.dec_sink (`String (data decoder))
+    | None -> error input (`Malformed_real data)
+    | Some float -> sink (`Real float))
+  | "string" -> sink (`String (data input))
   | "true" ->
-    close decoder;
-    decoder.dec_sink `True
-  | s -> error decoder (`Unknown_tag s)
+    close input;
+    sink `True
+  | s -> error input (`Unknown_tag s)
 
 let decode source sink =
-  let decoder = create_decoder source sink in
-  match Xmlm.input decoder.dec_source with
+  let input = Xmlm.make_input (`Fun source) in
+  match Xmlm.input input with
   | `Dtd _ -> (
-    match Xmlm.input decoder.dec_source with
+    match Xmlm.input input with
     | `El_start ((_, "plist"), _) -> (
-      skip_whitespace decoder;
-      match Xmlm.input decoder.dec_source with
+      skip_whitespace input;
+      match Xmlm.input input with
       | `El_start ((_, name), _) -> (
-        decode_tag decoder name;
-        skip_whitespace decoder;
-        match Xmlm.input decoder.dec_source with
-        | `El_end -> decoder.dec_sink `EOI
-        | _ -> error decoder `Expected_end)
-      | _ -> error decoder `Expected_start)
-    | _ -> error decoder (`Expected_tag "plist"))
+        decode_tag input sink name;
+        skip_whitespace input;
+        match Xmlm.input input with
+        | `El_end -> sink `EOI
+        | _ -> error input `Expected_end)
+      | _ -> error input `Expected_start)
+    | _ -> error input (`Expected_tag "plist"))
   | _ -> ()
 
-type encoder = { enc_source : unit -> signal; enc_sink : Xmlm.output }
-
-let create_encoder enc_source sink =
-  { enc_source; enc_sink = Xmlm.make_output (`Fun sink) }
-
-let encode_lexeme sink = function
-  | `Array_start -> Xmlm.output sink array_start_signal
-  | `Array_end -> Xmlm.output sink `El_end
+let encode_lexeme output = function
+  | `Array_start -> Xmlm.output output array_start_signal
+  | `Array_end -> Xmlm.output output `El_end
   | `Data data ->
-    Xmlm.output sink data_start_signal;
+    Xmlm.output output data_start_signal;
     let data = Base64.encode_string data in
-    if data <> "" then Xmlm.output sink (`Data data);
-    Xmlm.output sink `El_end
+    if data <> "" then Xmlm.output output (`Data data);
+    Xmlm.output output `El_end
   | `Date (datetime, None) ->
-    Xmlm.output sink date_start_signal;
-    Xmlm.output sink (`Data (ISO8601.Permissive.string_of_datetime datetime));
-    Xmlm.output sink `El_end
+    Xmlm.output output date_start_signal;
+    Xmlm.output output (`Data (ISO8601.Permissive.string_of_datetime datetime));
+    Xmlm.output output `El_end
   | `Date (datetime, Some tz) ->
-    Xmlm.output sink date_start_signal;
-    Xmlm.output sink
+    Xmlm.output output date_start_signal;
+    Xmlm.output output
       (`Data (ISO8601.Permissive.string_of_datetimezone (datetime, tz)));
-    Xmlm.output sink `El_end
-  | `Dict_start -> Xmlm.output sink dict_start_signal
-  | `Dict_end -> Xmlm.output sink `El_end
+    Xmlm.output output `El_end
+  | `Dict_start -> Xmlm.output output dict_start_signal
+  | `Dict_end -> Xmlm.output output `El_end
   | `False ->
-    Xmlm.output sink false_start_signal;
-    Xmlm.output sink `El_end
+    Xmlm.output output false_start_signal;
+    Xmlm.output output `El_end
   | `Int int ->
-    Xmlm.output sink integer_start_signal;
-    Xmlm.output sink (`Data (string_of_int int));
-    Xmlm.output sink `El_end
+    Xmlm.output output integer_start_signal;
+    Xmlm.output output (`Data (string_of_int int));
+    Xmlm.output output `El_end
   | `Key key ->
-    Xmlm.output sink key_start_signal;
-    if key <> "" then Xmlm.output sink (`Data key);
-    Xmlm.output sink `El_end
+    Xmlm.output output key_start_signal;
+    if key <> "" then Xmlm.output output (`Data key);
+    Xmlm.output output `El_end
   | `Real float ->
-    Xmlm.output sink real_start_signal;
-    Xmlm.output sink (`Data (string_of_float float));
-    Xmlm.output sink `El_end
+    Xmlm.output output real_start_signal;
+    Xmlm.output output (`Data (string_of_float float));
+    Xmlm.output output `El_end
   | `String data ->
-    Xmlm.output sink string_start_signal;
-    if data <> "" then Xmlm.output sink (`Data data);
-    Xmlm.output sink `El_end
+    Xmlm.output output string_start_signal;
+    if data <> "" then Xmlm.output output (`Data data);
+    Xmlm.output output `El_end
   | `True ->
-    Xmlm.output sink true_start_signal;
-    Xmlm.output sink `El_end
+    Xmlm.output output true_start_signal;
+    Xmlm.output output `El_end
 
 let encode source sink =
-  let encoder = create_encoder source sink in
-  Xmlm.output encoder.enc_sink dtd_signal;
-  Xmlm.output encoder.enc_sink (`El_start (("", "plist"), []));
+  let output = Xmlm.make_output (`Fun sink) in
+  Xmlm.output output dtd_signal;
+  Xmlm.output output (`El_start (("", "plist"), []));
   let rec loop () =
-    match encoder.enc_source () with
+    match source () with
     | `EOI -> ()
     | #lexeme as lexeme ->
-      encode_lexeme encoder.enc_sink lexeme;
+      encode_lexeme output lexeme;
       loop ()
   in
   loop ();
-  Xmlm.output encoder.enc_sink `El_end
+  Xmlm.output output `El_end
 
 let token_of_signal = function
   | `Array_start -> Parser.ARRAY_START
