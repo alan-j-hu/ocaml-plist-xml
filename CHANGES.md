@@ -1,3 +1,11 @@
+## 0.4.0 (Feb 21, 2023)
+
+Version 0.4.0 is a major rewrite with an API redesign that is not
+backwards-compatible. `plist-xml` now uses `xmlm` instead of `markup` for the
+underlying XML codec. The package `plist-xml-lwt` no longer exists. In the
+new API, `plist-xml` has both a high-level tree interface and a low-level
+streaming interface.
+
 ## 0.3.0 (Oct 28, 2020)
 
 - `plist_of_stream_exn` now takes a `(Markup.signal, s) Markup.stream` instead

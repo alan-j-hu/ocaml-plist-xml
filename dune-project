@@ -1,7 +1,7 @@
 (lang dune 2.7)
 (using menhir 2.0)
 (name plist-xml)
-(version 0.3.0)
+(version 0.4.0)
 (documentation https://alan-j-hu.github.io/ocaml-plist-xml/)
 (generate_opam_files true)
 

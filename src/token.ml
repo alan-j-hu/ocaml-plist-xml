@@ -31,8 +31,7 @@ kv ::= `Key plist
 
 type signal = [ token | `EOI ]
 (** Furthermore, a signal is either a token or an [`EOI] marker. A well-formed
-    signal sequence consists is a well-formed token sequence followed by an
-    [`EOI] marker, and represents a plist document.
+    signal sequence consists of a well-formed token sequence followed by [`EOI]     and represents a plist document.
     {v
 doc ::= plist `EOI
     v} *)
