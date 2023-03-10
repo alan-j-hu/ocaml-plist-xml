@@ -248,9 +248,9 @@ let parse source =
     assert false
   with E v -> v
 
-let of_channel in_channel = parse (fun () -> input_byte in_channel)
+let from_channel in_channel = parse (fun () -> input_byte in_channel)
 
-let of_string string =
+let from_string string =
   let idx = ref 0 in
   let source () =
     let i = !idx in

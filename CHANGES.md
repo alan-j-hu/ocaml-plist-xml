@@ -1,3 +1,9 @@
+## 0.5.0 (March 10, 2023)
+
+- Rename `of_channel` to `from_channel` and `of_string` to `from_string`. The
+  new names reflect the naming convention across multiple popular OCaml file
+  format libraries.
+
 ## 0.4.0 (Feb 21, 2023)
 
 Version 0.4.0 is a major rewrite with an API redesign that is not

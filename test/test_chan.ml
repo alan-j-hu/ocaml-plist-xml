@@ -1,6 +1,6 @@
 let read filename =
   In_channel.with_open_text filename (fun in_channel ->
-      Plist_xml.of_channel in_channel)
+      Plist_xml.from_channel in_channel)
 
 let test_pass () =
   let files = Sys.readdir "pass" in

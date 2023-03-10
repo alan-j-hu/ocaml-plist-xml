@@ -1,6 +1,6 @@
 let () =
   assert (
-    Plist_xml.of_string
+    Plist_xml.from_string
       {|<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -10,7 +10,7 @@ let () =
 |}
     = `Dict []);
   assert (
-    Plist_xml.of_string
+    Plist_xml.from_string
       {|<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><true/></plist>
@@ -20,7 +20,7 @@ let () =
 let () =
   try
     ignore
-      (Plist_xml.of_string
+      (Plist_xml.from_string
          {|<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><cool/></plist>
@@ -31,7 +31,7 @@ let () =
 let () =
   try
     ignore
-      (Plist_xml.of_string
+      (Plist_xml.from_string
          {|<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><true></plist>

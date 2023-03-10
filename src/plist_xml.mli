@@ -17,15 +17,15 @@ val parse : (unit -> int) -> t
     @raise Error For errors pertaining to the plist format.
     @raise Xmlm.Error For underlying XML errors. *)
 
-val of_channel : in_channel -> t
-(** [of_channel in_channel] reads a plist from [in_channel]. See
+val from_channel : in_channel -> t
+(** [from_channel in_channel] reads a plist from [in_channel]. See
     {!val:parse}.
 
     @raise Error
     @raise Xmlm.Error *)
 
-val of_string : string -> t
-(** [of_string string] reads a plist from [string]. See {!val:parse}.
+val from_string : string -> t
+(** [from_string string] reads a plist from [string]. See {!val:parse}.
 
     @raise Error
     @raise Xmlm.Error *)
