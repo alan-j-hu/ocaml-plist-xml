@@ -6,8 +6,8 @@
 (generate_opam_files true)
 
 (license MIT)
-(authors "Alan Hu <alanh@ccs.neu.edu>")
-(maintainers "Alan Hu <alanh@ccs.neu.edu>")
+(authors "Alan Hu <ahulambda@gmail.com>")
+(maintainers "Alan Hu <ahulambda@gmail.com>")
 (source (github alan-j-hu/ocaml-plist-xml))
 
 (package
