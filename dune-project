@@ -20,7 +20,6 @@
 Implementation of https://www.apple.com/DTDs/PropertyList-1.0.dtd.")
  (depends
   (base64 (>= 3.4))
-  (cstruct (>= 6.1))
   (ISO8601 (>= 0.2.6))
   (menhir (>= 20220210))
   (ocaml (>= 4.13))

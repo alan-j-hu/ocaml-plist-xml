@@ -1,3 +1,7 @@
+## 0.5.1 (April 6, 2025)
+
+- Remove unused dependency on `cstruct`.
+
 ## 0.5.0 (March 10, 2023)
 
 - Rename `of_channel` to `from_channel` and `of_string` to `from_string`. The
